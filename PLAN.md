@@ -7,13 +7,17 @@ headers self-certified in the tab, blocks fetched and re-validated in a Worker).
 
 ## What the fork actually is (from `bitcoinknots/bitcoin` tag `v29.4.1.knots20260508`)
 
-Not a new genesis. The chain keeps Bitcoin's history and hard-forks at a height:
+Not a new genesis. The chain keeps Bitcoin's history to **961,631**, the last block common with
+Core's chain. Knots' **961,632–961,639** are eight SHA256d (BIP110) blocks Core's chain does not
+have (Core mined different blocks there), and **961,640** is the first BLAKE2b block. All three
+boundaries are hard checkpoints in Knots, so a Knots node never reorgs onto Core's branch.
 
 | param | mainnet | testnet4 |
 |---|---|---|
 | `Blake2bHeight` (first BLAKE2b block) | 961,640 | 150,308 |
 | first BLAKE2b block hash | `0000000000000050c1e5f69672f459293be14f46e5a494e7a8c8541396f18eeb` | — |
-| last SHA256d block | 961,639 (checkpointed) | — |
+| last SHA256d block (Knots branch) | 961,639 `…13027e65` (checkpointed) | — |
+| last block shared with Core | 961,631 | — |
 | `Blake2bTargetShift` (one-off target ease at fork block) | 2^22 | default 2^20 |
 | RDTS window (800 kWU cap + reduced-data script rules) | from fork until parent MTP ≥ 2027-09-01 | until 2026-10-13 |
 | required coinbase headline in fork block | `8-30 NYPost Deride And Conquer` | — |
@@ -31,8 +35,8 @@ Consensus changes that matter to a light validator, in the order the engine meet
 3. **Difficulty**: identical 2016-block retarget with 4× clamp. Exactly one extra rule: at
    the fork block the computed target is shifted left by `Blake2bTargetShift` (clamped at powLimit).
    No BIP94 on mainnet, so the retarget bases on the last block's `bits`.
-   The fork sits 8 blocks into epoch 477 (961,632–963,647): a retarget at 963,648 uses the
-   SHA256d epoch-first time from 961,632.
+   The BLAKE2b fork sits 8 blocks into epoch 477 (961,632–963,647); the chain split itself is at
+   the epoch start, so the anchor epoch is exactly the Knots-only history.
 4. **Block body**: `txCount` in header must equal `vtx.size()`; merkle root / txid / wtxid /
    witness commitment are **unchanged** (still SHA256d); block weight ≤ **800,000** while RDTS
    is active (MTP-based expiry); fork block's coinbase scriptSig must contain the headline.
