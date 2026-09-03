@@ -59,39 +59,41 @@ Small. The full Knots diff for the fork is ~1,200 lines in `src/`, most of it pl
 | chain params node for `btc:mainnet-blake2b` in `chain.jsonld` | todo | data only |
 | RDTS script flags + unified sighash | later | ~300 lines, needs vectors from Knots QA |
 
-## The hard part is data, not code
+## Data sources
 
-There is no public esplora / explorer / NIP-333 feed for the BLAKE2b chain yet, and NIP-333
-assumes 80-byte headers. So the "health"-style page can't be pointed at mempool.space.
-Blocks are light (≤ 300 kB, few txs) and the interesting chain is only ~2,600 blocks old,
-so a static, epoch-sized export fits GitHub Pages:
+**mempool.guide** runs a full esplora API on the BLAKE2b chain (verified 2026-09-03, tip 966,385):
+`/api/blocks/tip/height`, `/api/block-height/<h>`, `/api/block/<hash>/header` returns the
+**164-byte v2 header (328 hex)**, `/api/block/<hash>` JSON carries a `header_v2` object,
+`/api/block/<hash>/raw` gives the full block. `tools/check-live.mjs` fetches real headers and
+reproduces the explorer's block hash + PoW check with `src/header-v2.js` (fork block, 961,641,
+first retarget block 963,648, tip: all match).
 
-- **anchor**: hard-code the fork epoch start (961,632) — its 8 SHA256d headers plus the
-  fork block — as the light client's "genesis". Prior history is checkpointed away exactly like
-  assumeUTXO does; a user who wants more can sync the SHA256d headers with the existing engine.
-- **epochs**: `epochs/477.headers.bin` (2016 × 164 B ≈ 330 kB), `epochs/477.blocks/<height>.hex`
-  (or one concatenated file with an offset index). One epoch at a time is a browser-friendly
-  unit: headers verify in milliseconds, blocks validate in a Worker while the UI stays live.
-- **producer**: a Knots 29.4.1 node (`getblockheader`/`getblock … 0`) → a tiny Node script that
-  writes the epoch files. Testnet4 (fork at 150,308, ~11 GB chain) is the cheap dry run;
-  mainnet needs IBD to 961,640 (use assumeUTXO 880,000 to shortcut) or a friend's node.
-- **live tip**: later. Options: extend the NIP-333 publisher with a `d=btc-blake2b` tag carrying
-  164-byte headers, or a WS→TCP bridge like browser-node act ⑤.
+So the health page pattern carries over almost unchanged: swap mempool.space for mempool.guide,
+teach the codec 164-byte headers, add the fork rules. Blocks are ~300 kB max and mostly tiny.
+
+**Later — own NIP-333 feed.** NIP-333 assumes 80-byte headers, so the BLAKE2b chain needs a
+new `d` tag (e.g. `btc-blake2b`) and 328-hex headers per entry. Publisher = a small script
+polling mempool.guide (or a Knots node) and signing kind-33333 events. The page then takes the
+tip from Nostr and gap-fills from esplora, exactly as health does today.
+
+**Epoch files** (optional, for offline / GitHub-Pages-only): an anchor at the fork epoch start
+(961,632, its 8 SHA256d headers + the fork block) and `epochs/<n>.headers.bin` (2016 x 164 B
+~ 330 kB). Nice-to-have once the live path works.
 
 ## Baby steps
 
 1. ✅ `src/blake2b.js`, `src/sha256.js` (+ taggedHash), `src/header-v2.js`; `npm test` green
-   against Knots' `block_header_v2.json`.
+   against Knots' `block_header_v2.json`; `tools/check-live.mjs` green against mempool.guide.
 2. Vendor the bitcoin-kernel `engine/` (AGPL) and patch `Codec.decode/encode('BlockHeader')`,
    `blockHash`, `checkProofOfWork` to dispatch on the version top bit. Re-run the upstream
    test suite to prove SHA256d behaviour is untouched.
 3. Add `btc:mainnet-blake2b` / `btc:testnet4-blake2b` to `chain.jsonld` (fork height, shift,
    RDTS expiry, headline, anchor headers) and the three header rules + three block rules.
-4. `tools/export-epoch.mjs`: RPC → `epochs/<n>.headers.bin` + block files. Run on testnet4 first.
-5. `index.html`: load anchor, load epoch, verify headers (PoW, link, height, difficulty incl.
-   the shift), then validate blocks in a Worker (structure, merkle, txCount, weight cap,
-   witness commitment, headline) — the health page minus esplora, plus the fork rules.
-6. Live tip feed; RDTS/unified-sighash script rules; prevout-resolving validation (SwiftSync-style).
+4. `index.html`: fork of the health page pointed at mempool.guide — newest N headers, verify
+   PoW / link / height / difficulty (incl. the shift), then validate blocks in a Worker
+   (structure, merkle, txCount, 800 kWU cap, witness commitment, headline).
+5. Own NIP-333 feed for the BLAKE2b chain (`d=btc-blake2b`, 164-byte headers) + page takes tip from Nostr.
+6. Epoch files for offline use; RDTS/unified-sighash script rules; prevout-resolving validation.
 
 ## References
 

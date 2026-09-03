@@ -7,7 +7,8 @@ Step 1 is done: a zero-dependency BLAKE2b-256, Core's tagged SHA256, and the 164
 header v2 codec + hash pipeline, verified against Bitcoin Knots' own test vectors.
 
 ```sh
-npm test
+npm test                       # Knots test vectors
+node tools/check-live.mjs      # real headers from mempool.guide: fork block + tip
 ```
 
 ```js
