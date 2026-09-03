@@ -80,6 +80,26 @@ tip from Nostr and gap-fills from esplora, exactly as health does today.
 (961,632, its 8 SHA256d headers + the fork block) and `epochs/<n>.headers.bin` (2016 x 164 B
 ~ 330 kB). Nice-to-have once the live path works.
 
+## UTXO snapshot at the transition
+
+The post-fork chain is small (~750 MB of blocks to date, near-empty blocks now), so the only
+large piece of state a validating client needs is the UTXO set as of the **last SHA256d block,
+961,639**. That is the natural genesis of the new chain and it never goes stale.
+
+- **Produce**: any non-pruned Knots node at tip, `dumptxoutset utxo-961639.dat rollback=961639`.
+  ~12 GB, ~180M coins, plus the `hash_serialized` MuHash that becomes the hardcoded commitment.
+  Cross-check the hash on two independent nodes before hardcoding it.
+- **Distribute**: WebTorrent, announced over Nostr (NIP-35) as done for earlier assumeutxo
+  snapshots — see https://nostrapps.github.io/ntorrent/?q=assumeutxo. The browser-node demo's
+  act ① already streams a snapshot from WebTorrent/HTTP into a sharded coin view, so the
+  desktop-browser path is: torrent → OPFS → coin view → validate forward from 961,640.
+- **Phone / light**: merkleize the snapshot once (root published beside the MuHash), shard the
+  coins by txid prefix as static files, and let a client fetch only the prevouts a block spends
+  with merkle paths over HTTP range requests. Files on a CDN or torrent, no bridge server.
+- **Upstream (parallel track, not on the critical path)**: PR the snapshot hash into Knots'
+  mainnet `m_assumeutxo_data` so `loadtxoutset` accepts it and the browser client and the
+  reference node share one commitment. Expect this to take a long time; nothing here waits on it.
+
 ## Baby steps
 
 1. ✅ `src/blake2b.js`, `src/sha256.js` (+ taggedHash), `src/header-v2.js`; `npm test` green
@@ -93,7 +113,10 @@ tip from Nostr and gap-fills from esplora, exactly as health does today.
    PoW / link / height / difficulty (incl. the shift), then validate blocks in a Worker
    (structure, merkle, txCount, 800 kWU cap, witness commitment, headline).
 5. Own NIP-333 feed for the BLAKE2b chain (`d=btc-blake2b`, 164-byte headers) + page takes tip from Nostr.
-6. Epoch files for offline use; RDTS/unified-sighash script rules; prevout-resolving validation.
+6. Snapshot at 961,639: produce, torrent it (NIP-35 announce), load into the browser coin view,
+   validate blocks forward with prevouts. RDTS/unified-sighash script rules land here.
+7. Merkleized sharded snapshot for phones; epoch files for offline use.
+   Parallel, non-blocking: Knots PR adding the snapshot hash to `m_assumeutxo_data`.
 
 ## References
 
