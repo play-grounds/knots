@@ -79,7 +79,13 @@ const overlay = await j(`${CDN}/schema/overlays/knots-blake2b.jsonld`);
 
 // ---- IndexedDB: one store per network, key = height, value = header hex ----
 const DB = 'knots-headers-node';
-const openDb = () => new Promise((res, rej) => { const q = indexedDB.open(DB, 2); q.onupgradeneeded = () => { const d = q.result; for (const n of Object.keys(NETS)) for (const st of [n, n + ':meta', n + ':blocks']) if (!d.objectStoreNames.contains(st)) d.createObjectStore(st); }; q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+const openDb = () => new Promise((res, rej) => {
+  const q = indexedDB.open(DB, 2);
+  q.onupgradeneeded = () => { const d = q.result; for (const n of Object.keys(NETS)) for (const st of [n, n + ':meta', n + ':blocks']) if (!d.objectStoreNames.contains(st)) d.createObjectStore(st); };
+  q.onblocked = () => log('storage upgrade blocked: another tab of this page holds the old database open; close it (or wait, it is asked to let go)', 'bad');
+  q.onsuccess = () => { const d = q.result; d.onversionchange = () => { d.close(); log('another tab upgraded the storage; reload this page', 'bad'); }; res(d); };
+  q.onerror = () => rej(q.error);
+});
 const tx = (db, store, mode, fn) => new Promise((res, rej) => { const t = db.transaction(store, mode); const r = fn(t.objectStore(store)); t.oncomplete = () => res(r?.result ?? r); t.onerror = () => rej(t.error); });
 const idbAll = (db, store) => tx(db, store, 'readonly', (s) => s.getAll());
 const idbAllKeys = (db, store) => tx(db, store, 'readonly', (s) => s.getAllKeys());
@@ -116,6 +122,7 @@ async function build(net) {
   for (const ws of sockets) { try { ws.close(); } catch {} } sockets = [];
   $('#log').innerHTML = ''; $('#tbl tbody').innerHTML = ''; $('#facts').innerHTML = '';
   const k = createKernel({ ...schemas, network: NETS[net].id, overlays: [knotsBlake2b(overlay)] });
+  log(`opening IndexedDB "${DB}" and data/headers-${net}.json…`);
   const meta = await j(`data/headers-${net}.json`);
   const db = await openDb();
   const s = { net, k, meta, db, startHeight: meta.startHeight, blocks: new Map(), cacheBytes: 0, extra: Object.fromEntries(Object.entries(meta.extra).map(([h, hex]) => [h, k.codec.decode('BlockHeader', hex)])), hexes: [], headers: [], hashes: [], results: [], from: [] };
