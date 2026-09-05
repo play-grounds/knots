@@ -24,7 +24,7 @@ const NODES = {
   mainnet: { network: 'btc:mainnet-blake2b', cli: [`${process.env.HOME}/bitcoin-knots/src/build/bin/bitcoin-cli`, `-conf=${process.env.HOME}/knots-mainnet/bitcoin.conf`] },
 };
 const { network, cli } = NODES[which];
-const rpc = (...a) => { const o = execFileSync(cli[0], [...cli.slice(1), ...a]).toString().trim(); try { return JSON.parse(o); } catch { return o; } };
+const rpc = (...a) => { const o = execFileSync(cli[0], [...cli.slice(1), ...a], { maxBuffer: 64 << 20 }).toString().trim(); try { return JSON.parse(o); } catch { return o; } };
 
 const k = createKernel({
   core: await load('schema/core.jsonld'), proof: await load('schema/proof.jsonld'), script: await load('schema/script.jsonld'),
@@ -41,7 +41,9 @@ const mark = (ok) => ok === true ? 'ok  ' : ok === false ? 'FAIL' : 'skip';
 
 console.log(`${network}  tip ${tip}  engine ${SCHEMA}\n`);
 console.log(`headers ${startHeight}..${tip} (11 earlier headers as MTP context)`);
-const res = k.headers.validateChain(window, { startHeight, prevContext, now: Math.floor(Date.now() / 1000) });
+// headers outside the window (epoch-first blocks, difficulty lookbacks) are fetched from the node on demand
+const chainAt = (h) => (h < 0 ? null : k.codec.decode('BlockHeader', rpc('getblockheader', rpc('getblockhash', String(h)), 'false')));
+const res = k.headers.validateChain(window, { startHeight, prevContext, now: Math.floor(Date.now() / 1000), chainAt });
 let bad = 0;
 for (const r of res) {
   const fails = r.results.filter((x) => x.ok === false);
