@@ -5,5 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": { "test": "node test/header-v2.test.mjs",
-    "live": "node tools/check-live.mjs" }
+    "live": "node tools/check-live.mjs",
+    "smoke": "node tools/smoke-kernel.mjs",
+    "validate": "node tools/validate-tip.mjs" }
 }
