@@ -1,7 +1,7 @@
 # knots-kernel
 
 Browser-side validation for the Bitcoin Knots BLAKE2b hardfork chain, built on the
-[bitcoin-kernel](https://bitcoin-kernel.com/) pure-JS consensus engine. See [PLAN.md](PLAN.md).
+[bitcoin-kernel](https://bitcoin-kernel.com/) pure-JS consensus engine. See [PLAN.md](PLAN.md), the live [headers page](https://play-grounds.github.io/knots/headers.html), and [docs/header-v2.md](docs/header-v2.md) for the 164-byte header layout and the time-offset flag.
 
 Step 1 is done: a zero-dependency BLAKE2b-256, Core's tagged SHA256, and the 164-byte
 header v2 codec + hash pipeline, verified against Bitcoin Knots' own test vectors.

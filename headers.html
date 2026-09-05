@@ -44,7 +44,7 @@
   <div class="wrap"><table id="tbl" hidden><thead><tr><th>height</th><th>hash</th><th>time (UTC)</th><th>age</th><th>bits</th><th>bytes</th><th>txs</th><th>rules</th><th>notes</th></tr></thead><tbody></tbody></table></div>
   <details><summary>how this works</summary>
     <p>Transport: <a href="https://nip-333.github.io/">NIP-333</a>, Bitcoin block headers over Nostr — one replaceable kind-33333 event per network carrying the latest twelve headers (<a href="https://nip-333.github.io/spec/">specification</a>; the <code>btcb2</code> / <code>tbtc4b2</code> codes and the 164-byte header are <a href="https://github.com/nip-333/nip-333.github.io/pull/9">proposed here</a>).</p>
-    <p>Engine: <code>bitcoin-desktop/schema@cc61f3e95d64</code> via jsDelivr, unmodified; the BLAKE2b support is the <code>knots-blake2b</code> overlay (a 164-byte header variant, the BLAKE2b proof-of-work hash, and seven fork rules), loaded with <code>createKernel</code>. Events are checked with the engine's NIP-01 verifier before their content is read. Relays: nos.lol, damus, nostr.band. Block hashes link to <a href="https://mempool.guide/">mempool.guide</a>, which follows the BLAKE2b chains. Source: <a href="https://github.com/play-grounds/knots">play-grounds/knots</a>.</p>
+    <p>Engine: <code>bitcoin-desktop/schema@cc61f3e95d64</code> via jsDelivr, unmodified; the BLAKE2b support is the <code>knots-blake2b</code> overlay (a 164-byte header variant, the BLAKE2b proof-of-work hash, and seven fork rules), loaded with <code>createKernel</code>. Events are checked with the engine's NIP-01 verifier before their content is read. Relays: nos.lol, damus, nostr.band. Block hashes link to <a href="https://mempool.guide/">mempool.guide</a>, which follows the BLAKE2b chains. Header layout and the <em>time offset</em> note: <a href="https://github.com/play-grounds/knots/blob/gh-pages/docs/header-v2.md">docs/header-v2.md</a>. Source: <a href="https://github.com/play-grounds/knots">play-grounds/knots</a>.</p>
   </details>
 </main>
 <script type="module">
@@ -86,7 +86,7 @@ function render(net) {
   for (const r of [...res].reverse()) {
     const h = headers[r.height - startHeight];
     const rules = r.results.map((x) => `<span class="${x.ok === true ? 'ok' : x.ok === false ? 'bad' : 'skip'}" title="${esc(x.rule)}${x.error ? ' — ' + esc(x.error) : ''}">${x.ok === true ? '✓' : x.ok === false ? '✗' : '·'}</span>`).join('');
-    const notes = [r.height === k.params.blake2bHeight ? 'fork block' : '', (h.flags & 4) ? 'time offset' : ''].filter(Boolean).join(', ');
+    const notes = [r.height === k.params.blake2bHeight ? 'fork block' : '', (h.flags & 4) ? `<a href="https://github.com/play-grounds/knots/blob/gh-pages/docs/header-v2.md#time-offset" target="_blank" rel="noopener">time offset</a>${h.timeOffset ? ' +' + h.timeOffset + 's' : ''}` : ''].filter(Boolean).join(', ');
     tb.insertAdjacentHTML('beforeend', `<tr><td>${r.height.toLocaleString()}</td><td><a href="${NETS[net].explorer}${r.hash}" target="_blank" rel="noopener"><code>${r.hash.slice(0, 24)}…</code></a></td><td>${fmt(h.time)}</td><td>${age(h.time)}</td><td><code>${h.bits.toString(16)}</code></td><td>${k.codec.encode('BlockHeader', h).length}</td><td>${h.txCount ?? '–'}</td><td class="rules">${rules}</td><td>${notes}</td></tr>`);
   }
   $('#tbl').hidden = false;
