@@ -1,0 +1,105 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BLAKE2b fork boundary</title>
+<meta name="description" content="Where Bitcoin Knots' BLAKE2b chains split from Bitcoin Core: the last shared block, the Knots-only SHA256d blocks, and the first BLAKE2b block, each header validated in your browser.">
+<link rel="canonical" href="https://play-grounds.github.io/knots/boundary.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="knots · play-grounds">
+<meta property="og:title" content="BLAKE2b fork boundary, verified in your tab">
+<meta property="og:description" content="The blocks where Bitcoin Knots' BLAKE2b chains left Bitcoin Core (mainnet 961,632 / 961,640, testnet4 150,308), validated with the bitcoin-desktop schema engine and its Knots overlay.">
+<meta property="og:url" content="https://play-grounds.github.io/knots/boundary.html">
+<meta property="og:image" content="https://play-grounds.github.io/knots/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BLAKE2b fork boundary, verified in your tab">
+<meta name="twitter:description" content="The blocks where Bitcoin Knots' BLAKE2b chains left Bitcoin Core, validated in the browser.">
+<meta name="twitter:image" content="https://play-grounds.github.io/knots/og.png">
+<style>
+  :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fbfbf9; --mute:#6b6b6b; --ok:#1d7f3a; --bad:#b3261e; --skip:#9a9a96; --link:#0b57d0; --shared:#f1efe8; --knots:#fff4dc; --blake:#e6f3ea; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e8e8e4; --bg:#141414; --mute:#9a9a96; --ok:#5fc27a; --bad:#ff7b72; --skip:#6b6b6b; --link:#8ab4f8; --shared:#1c1c1c; --knots:#2a2410; --blake:#12261a; } }
+  a { color: var(--link); }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 18px 48px; }
+  h1 { font-size: 1.35rem; margin: 0 0 6px; } .sub { color: var(--mute); margin: 0 0 18px; }
+  .nets { display:flex; gap:8px; margin: 0 0 14px; } .nets button { font:inherit; padding:6px 12px; border:1px solid var(--mute); border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
+  .nets button[aria-pressed=true] { border-color: var(--fg); font-weight: 600; }
+  .status { margin: 0 0 14px; } .status.bad { color: var(--bad); }
+  .status b { font-weight: 600; } .ok { color: var(--ok); } .bad { color: var(--bad); } .skip { color: var(--skip); }
+  .legend { display:flex; flex-wrap: wrap; gap: 14px; font-size: .9rem; color: var(--mute); margin: 0 0 12px; } .legend i { display:inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; border: 1px solid var(--mute); }
+  .wrap { overflow-x: auto; } table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); white-space: nowrap; font-size: .92rem; }
+  th { color: var(--mute); font-weight: 500; }
+  tr.shared td { background: var(--shared); } tr.knots td { background: var(--knots); } tr.blake td { background: var(--blake); }
+  tr.mark td { border-top: 2px solid var(--fg); }
+  td a { color: var(--link); text-decoration: none; border-bottom: 1px dotted var(--link); } td a:hover { text-decoration: none; border-bottom-style: solid; }
+  td.rules span { letter-spacing: 1px; cursor: help; } code { font-size: .88em; } td:last-child { white-space: normal; min-width: 240px; }
+  details { margin-top: 22px; color: var(--mute); font-size: .92rem; } summary { cursor: pointer; }
+</style>
+<main>
+  <h1>BLAKE2b fork boundary, verified in this tab</h1>
+  <p class="sub">The headers around the point where each Bitcoin Knots BLAKE2b chain left Bitcoin Core's chain, decoded and validated here with the schema engine and its Knots overlay. The headers are a static snapshot from a Knots node; they never change, so nothing is fetched live.</p>
+  <div class="nets" role="group" aria-label="network">
+    <button data-net="mainnet" aria-pressed="true">mainnet</button>
+    <button data-net="testnet4" aria-pressed="false">testnet4</button>
+  </div>
+  <div class="status" id="status">loading engine…</div>
+  <div class="legend"><span><i style="background:var(--shared)"></i>shared with Core</span><span><i style="background:var(--knots)"></i>Knots-only, SHA256d (80-byte header)</span><span><i style="background:var(--blake)"></i>BLAKE2b (164-byte header)</span><span>rules: ✓ pass · ✗ fail · · not applicable</span></div>
+  <div class="wrap"><table id="tbl" hidden><thead><tr><th>height</th><th>hash</th><th>time (UTC)</th><th>bits</th><th>bytes</th><th>txs</th><th>rules</th><th>notes</th></tr></thead><tbody></tbody></table></div>
+  <details><summary>how this works</summary>
+    <p>Not a new genesis. Knots keeps Bitcoin's history up to the <b>last shared block</b>. On mainnet the split is at 961,632, the start of difficulty period 477: Knots' 961,632–961,639 are eight ordinary SHA256d blocks that Core's chain does not have (Core mined different blocks at those heights), and 961,640 is the first BLAKE2b block with the 164-byte header. On testnet4 the split and the first BLAKE2b block coincide at 150,308. All of these are hard checkpoints in Knots, so a Knots node never reorganises onto Core's branch. Core rejects the first BLAKE2b header outright: it reads the version field as a signed integer and bit 31 makes it negative.</p>
+    <p>Each row runs the engine's header rules: link to the previous header, proof of work (SHA256d before the fork, BLAKE2b from it), difficulty, median time past, future time, version, timewarp, plus the overlay's fork rules (v1 until the fork, v2 from it, committed height, reserved flag bits). Difficulty is checked from the second header on, median-time-past once eleven prior headers are in view. Hover a mark for the rule name.</p>
+    <p>Engine: <code>bitcoin-desktop/schema@v0.0.25</code> via jsDelivr, unmodified; the BLAKE2b support is the <code>knots-blake2b</code> overlay. Data: <a href="data/boundary-mainnet.json">boundary-mainnet.json</a>, <a href="data/boundary-testnet4.json">boundary-testnet4.json</a> (from a local Knots node; the Core-side hash from a local Core node). Header layout: <a href="docs/header-v2.md">docs/header-v2.md</a>. Live tip: <a href="headers.html">headers page</a>. Source: <a href="https://github.com/play-grounds/knots">play-grounds/knots</a>.</p>
+  </details>
+</main>
+<script type="module">
+const PIN = 'v0.0.25';
+const CDN = `https://cdn.jsdelivr.net/gh/bitcoin-desktop/schema@${PIN}`;
+const NETS = {
+  mainnet: { id: 'btc:mainnet-blake2b', explorer: 'https://mempool.guide/block/' },
+  testnet4: { id: 'btc:testnet4-blake2b', explorer: 'https://mempool.guide/testnet4/block/' },
+};
+const $ = (s) => document.querySelector(s);
+const status = (html, cls = '') => { const el = $('#status'); el.className = 'status ' + cls; el.innerHTML = html; };
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const fmt = (t) => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
+const short = (h) => `<code>${h.slice(0, 24)}…</code>`;
+
+const [{ createKernel }, { knotsBlake2b }] = await Promise.all([import(`${CDN}/codec/kernel.js`), import(`${CDN}/codec/overlays/knots-blake2b.js`)]);
+const j = async (p) => (await fetch(p)).json();
+const schemas = Object.fromEntries(await Promise.all(['core', 'proof', 'chain', 'validate'].map(async (n) => [n, await j(`${CDN}/schema/${n}.jsonld`)])));
+const overlay = await j(`${CDN}/schema/overlays/knots-blake2b.jsonld`);
+const kernels = {}, data = {};
+const kernelFor = (net) => (kernels[net] ??= createKernel({ ...schemas, network: NETS[net].id, overlays: [knotsBlake2b(overlay)] }));
+
+async function render(net) {
+  const k = kernelFor(net);
+  const d = (data[net] ??= await j(`data/boundary-${net}.json`));
+  const headers = d.headers.map((x) => k.codec.decode('BlockHeader', x.hex));
+  const res = k.headers.validateChain(headers, { startHeight: d.startHeight, now: Math.floor(Date.now() / 1000) });
+  const fails = res.reduce((a, r) => a + r.results.filter((x) => x.ok === false).length, 0);
+  const hashOk = res.every((r, i) => r.hash === d.headers[i].hash);
+  status(`<b>${net}</b> — ${headers.length} headers, ${d.startHeight.toLocaleString()} to ${(d.startHeight + headers.length - 1).toLocaleString()} · last shared block <b>${d.lastShared.toLocaleString()}</b> · first BLAKE2b block <b>${d.forkHeight.toLocaleString()}</b> · hashes ${hashOk ? '<span class="ok">match the node</span>' : '<span class="bad">DIFFER from the node</span>'} · chain rules: <span class="${fails ? 'bad' : 'ok'}">${fails ? fails + ' FAILED' : 'all pass'}</span>`, fails || !hashOk ? 'bad' : '');
+  const tb = $('#tbl tbody'); tb.innerHTML = '';
+  for (const r of res) {
+    const i = r.height - d.startHeight, h = headers[i], meta = d.headers[i];
+    const cls = r.height <= d.lastShared ? 'shared' : r.height < d.forkHeight ? 'knots' : 'blake';
+    const mark = r.height === d.splitHeight || r.height === d.forkHeight ? ' mark' : '';
+    const rules = r.results.map((x) => `<span class="${x.ok === true ? 'ok' : x.ok === false ? 'bad' : 'skip'}" title="${esc(x.rule)}${x.error ? ' — ' + esc(x.error) : ''}">${x.ok === true ? '✓' : x.ok === false ? '✗' : '·'}</span>`).join('');
+    const notes = [];
+    if (r.height === d.lastShared) notes.push('last block shared with Core');
+    if (r.height === d.splitHeight) notes.push(`chain split; Core's block here is <a href="${d.coreExplorer}${d.coreHash}" target="_blank" rel="noopener">${short(d.coreHash)}</a>`);
+    if (r.height === d.splitHeight && r.height % 2016 === 0) notes.push(`difficulty period ${r.height / 2016} starts`);
+    if (r.height === d.forkHeight) notes.push('first BLAKE2b block');
+    if (h.flags & 4) notes.push(`<a href="docs/header-v2.md#time-offset">time offset</a>${h.timeOffset ? ' +' + h.timeOffset + 's' : ''}`);
+    tb.insertAdjacentHTML('beforeend', `<tr class="${cls}${mark}"><td>${r.height.toLocaleString()}</td><td><a href="${NETS[net].explorer}${r.hash}" target="_blank" rel="noopener">${short(r.hash)}</a></td><td>${fmt(h.time)}</td><td><code>${h.bits.toString(16)}</code></td><td>${k.codec.encode('BlockHeader', h).length}</td><td>${meta.nTx}</td><td class="rules">${rules}</td><td>${notes.join('; ')}</td></tr>`);
+  }
+  $('#tbl').hidden = false;
+}
+for (const b of document.querySelectorAll('.nets button')) b.onclick = () => {
+  for (const x of document.querySelectorAll('.nets button')) x.setAttribute('aria-pressed', String(x === b));
+  render(b.dataset.net).catch((e) => status(esc(e.message), 'bad'));
+};
+render('mainnet').catch((e) => status(esc(e.message), 'bad'));
+</script>
