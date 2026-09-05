@@ -184,6 +184,23 @@ async function append(s, newHexes, from) {
   return true;
 }
 
+// Fill heights lo..hi from the static block window: its manifest names height and hash,
+// the block bytes carry the header. Each header is verified like any other before it is kept.
+async function fillGap(s, lo, hi) {
+  let man; try { man = await j(`data/blocks/${s.net}/manifest.json`); } catch (e) { log(`manifest: ${e.message}`, 'bad'); return false; }
+  const byHeight = new Map(man.blocks.map((b) => [b.height, b]));
+  for (let h = lo; h <= hi; h++) {
+    const m = byHeight.get(h); if (!m) { log(`static window has no block ${h} (it covers ${man.first}..${man.last})`, 'bad'); return false; }
+    let bytes; try { const r = await fetch(`data/blocks/${s.net}/${m.hash}.bin`); if (!r.ok) throw new Error(`HTTP ${r.status}`); bytes = new Uint8Array(await r.arrayBuffer()); } catch (e) { log(`block ${h}: ${e.message}`, 'bad'); return false; }
+    const hlen = (bytes[3] & 0x80) ? 164 : 80;
+    const hex = toHex(bytes.subarray(0, hlen));
+    if (!(await append(s, [hex], 'static block window'))) return false;
+    if ($('#auto').checked) fetchBlock(s, h).catch((e) => log(`error: ${e.message}`, 'bad'));
+  }
+  render();
+  return true;
+}
+
 // A NIP-333 window: [{height, hex, hash}] in height order.
 async function consider(s, win, from) {
   const tipH = s.startHeight + s.headers.length - 1, tipHash = s.hashes.at(-1);
@@ -193,7 +210,11 @@ async function consider(s, win, from) {
     if (dis.length) log(`${from}: event tip ${last} is behind ours (${tipH}) and ${dis.length} header(s) differ; ignored`);
     return;
   }
-  if (first > tipH + 1) { log(`${from}: gap — event covers ${first}..${last}, our tip is ${tipH}; need ${first - tipH - 1} more header(s), no source for them yet`, 'bad'); return; }
+  if (first > tipH + 1) {
+    log(`${from}: gap — event covers ${first}..${last}, our tip is ${tipH}; trying to fill ${first - tipH - 1} header(s) from the static block window`);
+    if (!(await fillGap(s, tipH + 1, first - 1))) { log(`gap not filled; waiting for another source`, 'bad'); return; }
+    return consider(s, win, from);
+  }
   // common prefix
   let forkAt = tipH;
   for (const w of win) { if (w.height > tipH) break; if (s.hashes[w.height - s.startHeight] !== w.hash) { forkAt = w.height - 1; break; } }
