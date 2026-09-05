@@ -2,6 +2,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BLAKE2b headers · NIP-333</title>
+<meta name="description" content="The latest twelve headers of the Bitcoin Knots BLAKE2b chains (mainnet btcb2, testnet4 tbtc4b2) over Nostr, decoded and validated in your browser: proof of work, linkage, difficulty and the fork rules.">
+<link rel="canonical" href="https://play-grounds.github.io/knots/headers.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="knots · play-grounds">
+<meta property="og:title" content="BLAKE2b chain headers, verified in your tab">
+<meta property="og:description" content="Bitcoin Knots mainnet (btcb2) and testnet4 (tbtc4b2) headers over Nostr (NIP-333), validated with the bitcoin-desktop schema engine and its Knots overlay. The publisher is a convenience, never an authority.">
+<meta property="og:url" content="https://play-grounds.github.io/knots/headers.html">
+<meta property="og:image" content="https://play-grounds.github.io/knots/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BLAKE2b chain headers, verified in your tab">
+<meta name="twitter:description" content="Bitcoin Knots mainnet and testnet4 headers over Nostr, validated in the browser.">
+<meta name="twitter:image" content="https://play-grounds.github.io/knots/og.png">
 <style>
   :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fbfbf9; --mute:#6b6b6b; --ok:#1d7f3a; --bad:#b3261e; --skip:#8a7a2a; --line:#e2e2de; --card:#fff; }
   @media (prefers-color-scheme: dark) { :root { --fg:#e8e8e4; --bg:#141414; --mute:#9a9a96; --ok:#5fc27a; --bad:#ff7b72; --skip:#d8c25a; --line:#2a2a2a; --card:#1c1c1c; } }
@@ -26,7 +39,7 @@
     <button data-net="tbtc4b2" aria-pressed="false">testnet4 · tbtc4b2</button>
   </div>
   <div class="status" id="status">loading engine…</div>
-  <div class="wrap"><table id="tbl" hidden><thead><tr><th>height</th><th>hash</th><th>time (UTC)</th><th>age</th><th>bits</th><th>txs</th><th>rules</th><th>notes</th></tr></thead><tbody></tbody></table></div>
+  <div class="wrap"><table id="tbl" hidden><thead><tr><th>height</th><th>hash</th><th>time (UTC)</th><th>age</th><th>bits</th><th>bytes</th><th>txs</th><th>rules</th><th>notes</th></tr></thead><tbody></tbody></table></div>
   <details><summary>how this works</summary>
     <p>Transport: <a href="https://nip-333.github.io/">NIP-333</a>, Bitcoin block headers over Nostr — one replaceable kind-33333 event per network carrying the latest twelve headers (<a href="https://nip-333.github.io/spec/">specification</a>; the <code>btcb2</code> / <code>tbtc4b2</code> codes and the 164-byte header are <a href="https://github.com/nip-333/nip-333.github.io/pull/9">proposed here</a>).</p>
     <p>Engine: <code>bitcoin-desktop/schema@cc61f3e95d64</code> via jsDelivr, unmodified; the BLAKE2b support is the <code>knots-blake2b</code> overlay (a 164-byte header variant, the BLAKE2b proof-of-work hash, and seven fork rules), loaded with <code>createKernel</code>. Events are checked with the engine's NIP-01 verifier before their content is read. Relays: nos.lol, damus, nostr.band. Source: <a href="https://github.com/play-grounds/knots">play-grounds/knots</a>.</p>
@@ -69,7 +82,7 @@ function render(net) {
     const h = headers[r.height - startHeight];
     const rules = r.results.map((x) => `<span class="${x.ok === true ? 'ok' : x.ok === false ? 'bad' : 'skip'}" title="${esc(x.rule)}${x.error ? ' — ' + esc(x.error) : ''}">${x.ok === true ? '✓' : x.ok === false ? '✗' : '·'}</span>`).join('');
     const notes = [r.height === k.params.blake2bHeight ? 'fork block' : '', (h.flags & 4) ? 'time offset' : ''].filter(Boolean).join(', ');
-    tb.insertAdjacentHTML('beforeend', `<tr><td>${r.height.toLocaleString()}</td><td><code>${r.hash.slice(0, 24)}…</code></td><td>${fmt(h.time)}</td><td>${age(h.time)}</td><td><code>${h.bits.toString(16)}</code></td><td>${h.txCount}</td><td class="rules">${rules}</td><td>${notes}</td></tr>`);
+    tb.insertAdjacentHTML('beforeend', `<tr><td>${r.height.toLocaleString()}</td><td><code>${r.hash.slice(0, 24)}…</code></td><td>${fmt(h.time)}</td><td>${age(h.time)}</td><td><code>${h.bits.toString(16)}</code></td><td>${k.codec.encode('BlockHeader', h).length}</td><td>${h.txCount ?? '–'}</td><td class="rules">${rules}</td><td>${notes}</td></tr>`);
   }
   $('#tbl').hidden = false;
 }
