@@ -44,11 +44,11 @@
   <div class="wrap"><table id="tbl" hidden><thead><tr><th>height</th><th>hash</th><th>time (UTC)</th><th>age</th><th>bits</th><th>bytes</th><th>txs</th><th>rules</th><th>notes</th></tr></thead><tbody></tbody></table></div>
   <details><summary>how this works</summary>
     <p>Transport: <a href="https://nip-333.github.io/">NIP-333</a>, Bitcoin block headers over Nostr — one replaceable kind-33333 event per network carrying the latest twelve headers (<a href="https://nip-333.github.io/spec/">specification</a>; the <code>btcb2</code> / <code>tbtc4b2</code> codes and the 164-byte header are <a href="https://github.com/nip-333/nip-333.github.io/pull/9">proposed here</a>).</p>
-    <p>Engine: <code>bitcoin-desktop/schema@cc61f3e95d64</code> via jsDelivr, unmodified; the BLAKE2b support is the <code>knots-blake2b</code> overlay (a 164-byte header variant, the BLAKE2b proof-of-work hash, and seven fork rules), loaded with <code>createKernel</code>. Events are checked with the engine's NIP-01 verifier before their content is read. Relays: nos.lol, damus, nostr.band. Block hashes link to <a href="https://mempool.guide/">mempool.guide</a>, which follows the BLAKE2b chains. Header layout and the <em>time offset</em> note: <a href="https://github.com/play-grounds/knots/blob/gh-pages/docs/header-v2.md">docs/header-v2.md</a>. Source: <a href="https://github.com/play-grounds/knots">play-grounds/knots</a>.</p>
+    <p>Engine: <code>bitcoin-desktop/schema@v0.0.25</code> via jsDelivr, unmodified; the BLAKE2b support is the <code>knots-blake2b</code> overlay (a 164-byte header variant, the BLAKE2b proof-of-work hash, and seven fork rules), loaded with <code>createKernel</code>. Events are checked with the engine's NIP-01 verifier before their content is read. Relays: nos.lol, damus, nostr.band. Block hashes link to <a href="https://mempool.guide/">mempool.guide</a>, which follows the BLAKE2b chains. Header layout and the <em>time offset</em> note: <a href="https://github.com/play-grounds/knots/blob/gh-pages/docs/header-v2.md">docs/header-v2.md</a>. Source: <a href="https://github.com/play-grounds/knots">play-grounds/knots</a>.</p>
   </details>
 </main>
 <script type="module">
-const PIN = 'cc61f3e95d64';
+const PIN = 'v0.0.25';
 const CDN = `https://cdn.jsdelivr.net/gh/bitcoin-desktop/schema@${PIN}`;
 const RELAYS = ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.nostr.band'];
 const NETS = {
