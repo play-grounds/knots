@@ -9,6 +9,7 @@
     "live": "node tools/check-live.mjs",
     "smoke": "node tools/smoke-kernel.mjs",
     "validate": "node tools/validate-tip.mjs",
-    "export-tip": "node tools/export-tip.mjs all"
+    "export-tip": "node tools/export-tip.mjs all",
+    "export-headers": "node tools/export-headers.mjs all"
   }
 }

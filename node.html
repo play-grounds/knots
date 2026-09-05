@@ -1,0 +1,231 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>BLAKE2b headers node</title>
+<style>
+  :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fbfbf9; --mute:#6b6b6b; --ok:#1d7f3a; --bad:#b3261e; --skip:#9a9a96; --link:#0b57d0; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e8e8e4; --bg:#141414; --mute:#9a9a96; --ok:#5fc27a; --bad:#ff7b72; --skip:#6b6b6b; --link:#8ab4f8; } }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); } a { color: var(--link); }
+  body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 18px 48px; }
+  h1 { font-size: 1.35rem; margin: 0 0 6px; } .sub { color: var(--mute); margin: 0 0 18px; }
+  h2 { font-size: 1.05rem; margin: 22px 0 6px; }
+  .nets { display:flex; gap:8px; margin: 0 0 14px; align-items:center; } .nets button { font:inherit; padding:6px 12px; border:1px solid var(--mute); border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
+  .nets button[aria-pressed=true] { border-color: var(--fg); font-weight: 600; } .nets .reset { margin-left: auto; font-size: .85rem; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .skip { color: var(--skip); }
+  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 3px 16px; font-size: .92rem; margin: 6px 0 4px; } .facts dt { color: var(--mute); } .facts dd { margin: 0; overflow-wrap: anywhere; }
+  .log { font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--mute); max-height: 240px; overflow: auto; border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent); border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; }
+  .wrap { overflow-x: auto; } table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); white-space: nowrap; font-size: .92rem; }
+  th { color: var(--mute); font-weight: 500; } td.rules span { letter-spacing: 1px; cursor: help; } code { font-size: .88em; }
+  details { margin-top: 22px; color: var(--mute); font-size: .92rem; } summary { cursor: pointer; }
+</style>
+<main>
+  <h1>BLAKE2b headers node</h1>
+  <p class="sub">A header chain for a Bitcoin Knots BLAKE2b chain that lives in this browser: seeded from a checkpoint and a static file, verified with the schema engine, saved in IndexedDB, and followed live over Nostr. Unlinked experiment.</p>
+  <div class="nets" role="group" aria-label="network">
+    <button data-net="mainnet" aria-pressed="true">mainnet</button>
+    <button data-net="testnet4" aria-pressed="false">testnet4</button>
+    <button class="reset" id="reset" title="delete this network's saved headers and rebuild from the static file">reset storage</button>
+  </div>
+  <dl class="facts" id="facts"></dl>
+  <h2>log</h2><div class="log" id="log"></div>
+  <h2>tail</h2>
+  <div class="wrap"><table id="tbl"><thead><tr><th>height</th><th>hash</th><th>time (UTC)</th><th>bits</th><th>bytes</th><th>rules</th><th>from</th></tr></thead><tbody></tbody></table></div>
+  <details><summary>how this works</summary>
+    <p>Seed: <code>data/headers-&lt;net&gt;.json</code> names a checkpoint (the last block shared with Bitcoin Core, a hard checkpoint in Knots) and <code>data/headers-&lt;net&gt;.bin</code> holds every header from eleven blocks before it to the tip at export time, 80 or 164 bytes each. The page verifies the checkpoint hash and runs every header rule over the whole chain (proof of work, linkage, difficulty with the fork adjustment, median time past, future time, version, timewarp, the fork rules) before keeping anything. Verified headers go to IndexedDB; on reload they are restored from there, re-verified, and only newer headers are fetched.</p>
+    <p>Live: the NIP-333 stream for the chain (kind 33333, twelve headers per event, signature checked). New headers that connect to the tip are validated against the stored chain and appended. If an event shows a different chain over recent heights, the branch with more work wins and the loser is dropped. Sources are never trusted; every header is verified locally.</p>
+    <p>Engine: <code>bitcoin-desktop/schema@v0.0.25</code> via jsDelivr with the <code>knots-blake2b</code> overlay. Nothing here fetches block bodies.</p>
+  </details>
+</main>
+<script type="module">
+const PIN = 'v0.0.25';
+const CDN = `https://cdn.jsdelivr.net/gh/bitcoin-desktop/schema@${PIN}`;
+const RELAYS = ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.nostr.band'];
+const NETS = {
+  mainnet: { id: 'btc:mainnet-blake2b', d: 'btcb2', explorer: 'https://mempool.guide/block/' },
+  testnet4: { id: 'btc:testnet4-blake2b', d: 'tbtc4b2', explorer: 'https://mempool.guide/testnet4/block/' },
+};
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (t) => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
+const now = () => Math.floor(Date.now() / 1000);
+const log = (msg, cls = '') => { const el = $('#log'); el.insertAdjacentHTML('beforeend', `<div class="${cls}">${new Date().toISOString().slice(11, 19)} ${esc(msg)}</div>`); el.scrollTop = el.scrollHeight; };
+const toHex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+const log2 = (n) => n.toString(2).length - 1;
+
+const [{ createKernel }, { knotsBlake2b }, { verifyNostrEvent }] = await Promise.all([import(`${CDN}/codec/kernel.js`), import(`${CDN}/codec/overlays/knots-blake2b.js`), import(`${CDN}/codec/nostr.js`)]);
+const j = async (p) => { const r = await fetch(p); if (!r.ok) throw new Error(`${p}: ${r.status}`); return r.json(); };
+const schemas = Object.fromEntries(await Promise.all(['core', 'proof', 'chain', 'validate'].map(async (n) => [n, await j(`${CDN}/schema/${n}.jsonld`)])));
+const overlay = await j(`${CDN}/schema/overlays/knots-blake2b.jsonld`);
+
+// ---- IndexedDB: one store per network, key = height, value = header hex ----
+const DB = 'knots-headers-node';
+const openDb = () => new Promise((res, rej) => { const q = indexedDB.open(DB, 1); q.onupgradeneeded = () => { for (const n of Object.keys(NETS)) { q.result.createObjectStore(n); q.result.createObjectStore(n + ':meta'); } }; q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+const tx = (db, store, mode, fn) => new Promise((res, rej) => { const t = db.transaction(store, mode); const r = fn(t.objectStore(store)); t.oncomplete = () => res(r?.result ?? r); t.onerror = () => rej(t.error); });
+const idbAll = (db, store) => tx(db, store, 'readonly', (s) => s.getAll());
+const idbAllKeys = (db, store) => tx(db, store, 'readonly', (s) => s.getAllKeys());
+const idbPut = (db, store, entries) => tx(db, store, 'readwrite', (s) => { for (const [k, v] of entries) s.put(v, k); });
+const idbDeleteFrom = (db, store, from) => tx(db, store, 'readwrite', (s) => s.delete(IDBKeyRange.lowerBound(from)));
+const idbClear = (db, store) => tx(db, store, 'readwrite', (s) => s.clear());
+
+// ---- the chain in memory ----
+// state = { net, k, meta, startHeight, headers: [decoded], hexes: [hex], hashes: [hex], results: [validateChain rows], extra: {height: decoded}, from: [source per header] }
+let state = null, sockets = [], current = 'mainnet';
+
+function parseBin(bytes) {
+  const out = []; let p = 0;
+  while (p < bytes.length) {
+    const version = bytes[p] | (bytes[p + 1] << 8) | (bytes[p + 2] << 16) | (bytes[p + 3] << 24);
+    const len = (version >>> 31) ? 164 : 80;
+    if (p + len > bytes.length) throw new Error(`truncated header at byte ${p}`);
+    out.push(toHex(bytes.subarray(p, p + len))); p += len;
+  }
+  return out;
+}
+const chainAtFor = (s) => (h) => { const i = h - s.startHeight; if (i >= 0 && i < s.headers.length) return s.headers[i]; return s.extra[h] ?? null; };
+
+function validateAll(s) {
+  const t0 = performance.now();
+  const res = s.k.headers.validateChain(s.headers, { startHeight: s.startHeight, now: now(), chainAt: chainAtFor(s) });
+  const fails = res.flatMap((r) => r.results.filter((x) => x.ok === false).map((x) => `${r.height} ${x.label}: ${x.error ?? ''}`));
+  return { res, fails, ms: Math.round(performance.now() - t0) };
+}
+
+async function build(net) {
+  for (const ws of sockets) { try { ws.close(); } catch {} } sockets = [];
+  $('#log').innerHTML = ''; $('#tbl tbody').innerHTML = ''; $('#facts').innerHTML = '';
+  const k = createKernel({ ...schemas, network: NETS[net].id, overlays: [knotsBlake2b(overlay)] });
+  const meta = await j(`data/headers-${net}.json`);
+  const db = await openDb();
+  const s = { net, k, meta, db, startHeight: meta.startHeight, extra: Object.fromEntries(Object.entries(meta.extra).map(([h, hex]) => [h, k.codec.decode('BlockHeader', hex)])), hexes: [], headers: [], hashes: [], results: [], from: [] };
+  state = s;
+  // 1. restore from IndexedDB if it has a chain that starts where the seed starts
+  const keys = await idbAllKeys(db, net);
+  let source = 'IndexedDB';
+  if (keys.length && keys[0] === meta.startHeight && keys.at(-1) === meta.startHeight + keys.length - 1) {
+    s.hexes = await idbAll(db, net);
+    log(`restored ${s.hexes.length} headers from IndexedDB (${meta.startHeight.toLocaleString()} to ${(meta.startHeight + s.hexes.length - 1).toLocaleString()})`);
+  } else {
+    if (keys.length) { log(`stored chain does not match the seed (starts ${keys[0]}); rebuilding`, 'bad'); await idbClear(db, net); }
+    const t0 = performance.now();
+    const bin = new Uint8Array(await (await fetch(`data/headers-${net}.bin`)).arrayBuffer());
+    s.hexes = parseBin(bin);
+    source = 'static file';
+    log(`fetched data/headers-${net}.bin: ${bin.length.toLocaleString()} bytes, ${s.hexes.length} headers in ${Math.round(performance.now() - t0)} ms`);
+  }
+  s.headers = s.hexes.map((h) => k.codec.decode('BlockHeader', h));
+  s.from = s.hexes.map(() => source);
+  // 2. checkpoint
+  const cpIndex = meta.checkpoint.height - s.startHeight;
+  const cpHash = k.codec.blockHash(s.headers[cpIndex]);
+  if (cpHash !== meta.checkpoint.hash) { log(`checkpoint mismatch at ${meta.checkpoint.height}: ${cpHash}`, 'bad'); await idbClear(db, net); return render(); }
+  log(`checkpoint ${meta.checkpoint.height.toLocaleString()} ${meta.checkpoint.hash.slice(0, 24)}… matches`);
+  // 3. verify everything
+  const v = validateAll(s);
+  if (v.fails.length) { log(`${v.fails.length} rule failures; dropping the chain: ${v.fails.slice(0, 3).join(' | ')}`, 'bad'); await idbClear(db, net); s.hexes = []; s.headers = []; return render(); }
+  s.results = v.res; s.hashes = v.res.map((r) => r.hash);
+  log(`verified ${s.headers.length} headers, ${v.res[0].results.length} rules each, in ${v.ms} ms; chain work 2^${log2(v.res.at(-1).chainWork)}`, 'ok');
+  // 4. persist (only if it came from the file)
+  if (source !== 'IndexedDB') { await idbPut(db, net, s.hexes.map((h, i) => [s.startHeight + i, h])); log(`saved ${s.hexes.length} headers to IndexedDB`); }
+  render();
+  subscribe(net);
+}
+
+// Append headers [tipHeight+1 ..] that connect to our tip; validate them with the stored chain as context.
+async function append(s, newHexes, from) {
+  const k = s.k, base = s.headers.length;
+  const hdrs = newHexes.map((h) => k.codec.decode('BlockHeader', h));
+  const res = k.headers.validateChain(hdrs, { startHeight: s.startHeight + base, prevContext: s.headers.slice(-11), now: now(), chainAt: chainAtFor(s) });
+  const fails = res.flatMap((r) => r.results.filter((x) => x.ok === false).map((x) => `${r.height} ${x.label}: ${x.error ?? ''}`));
+  if (fails.length) { log(`rejected ${hdrs.length} header(s) from ${from}: ${fails.join(' | ')}`, 'bad'); return false; }
+  let work = s.results.at(-1)?.chainWork ?? 0n;
+  for (const r of res) { work += k.headers.work(hdrs[r.height - s.startHeight - base]); r.chainWork = work; }
+  s.hexes.push(...newHexes); s.headers.push(...hdrs); s.results.push(...res); s.hashes.push(...res.map((r) => r.hash)); s.from.push(...newHexes.map(() => from));
+  await idbPut(s.db, s.net, newHexes.map((h, i) => [s.startHeight + base + i, h]));
+  log(`appended ${hdrs.length} header(s) from ${from}: tip ${(s.startHeight + s.headers.length - 1).toLocaleString()} ${s.hashes.at(-1).slice(0, 24)}…`, 'ok');
+  return true;
+}
+
+// A NIP-333 window: [{height, hex, hash}] in height order.
+async function consider(s, win, from) {
+  const tipH = s.startHeight + s.headers.length - 1, tipHash = s.hashes.at(-1);
+  const first = win[0].height, last = win.at(-1).height;
+  if (last <= tipH) { // does it agree with us?
+    const dis = win.filter((w) => s.hashes[w.height - s.startHeight] !== w.hash);
+    if (dis.length) log(`${from}: event tip ${last} is behind ours (${tipH}) and ${dis.length} header(s) differ; ignored`);
+    return;
+  }
+  if (first > tipH + 1) { log(`${from}: gap — event covers ${first}..${last}, our tip is ${tipH}; need ${first - tipH - 1} more header(s), no source for them yet`, 'bad'); return; }
+  // common prefix
+  let forkAt = tipH;
+  for (const w of win) { if (w.height > tipH) break; if (s.hashes[w.height - s.startHeight] !== w.hash) { forkAt = w.height - 1; break; } }
+  if (forkAt === tipH) {
+    const next = win.filter((w) => w.height > tipH);
+    if (next[0].prev !== tipHash) { log(`${from}: header ${next[0].height} does not link to our tip; ignored`, 'bad'); return; }
+    await append(s, next.map((w) => w.hex), from);
+    return render();
+  }
+  // reorg candidate: compare work of what we'd drop against what we'd add
+  const dropped = s.headers.slice(forkAt + 1 - s.startHeight), added = win.filter((w) => w.height > forkAt);
+  const wd = dropped.reduce((a, h) => a + s.k.headers.work(h), 0n), wa = added.reduce((a, w) => a + s.k.headers.work(s.k.codec.decode('BlockHeader', w.hex)), 0n);
+  if (wa <= wd) { log(`${from}: competing branch from ${forkAt + 1} (${added.length} headers, work 2^${log2(wa)}) has no more work than ours (${dropped.length} headers, 2^${log2(wd)}); kept ours`); return; }
+  log(`${from}: reorg — branch from ${forkAt + 1} has more work (2^${log2(wa)} vs 2^${log2(wd)}); dropping ${dropped.length} header(s)`, 'bad');
+  const keep = forkAt + 1 - s.startHeight;
+  s.hexes.length = keep; s.headers.length = keep; s.results.length = keep; s.hashes.length = keep; s.from.length = keep;
+  await idbDeleteFrom(s.db, s.net, forkAt + 1);
+  await append(s, added.map((w) => w.hex), from);
+  render();
+}
+
+function subscribe(net, urls = RELAYS) {
+  const d = NETS[net].d, s = state;
+  for (const url of urls) {
+    let ws; try { ws = new WebSocket(url); } catch { continue; }
+    sockets.push(ws);
+    ws.onopen = () => { log(`relay ${url.replace('wss://', '')}: subscribed to #d ${d}`); ws.send(JSON.stringify(['REQ', 'n', { kinds: [33333], '#d': [d] }])); };
+    ws.onmessage = (m) => {
+      let e; try { e = JSON.parse(m.data); } catch { return; }
+      if (e[0] !== 'EVENT' || state !== s) return;
+      const ev = e[2];
+      if (ev.kind !== 33333 || ev.tags.find((t) => t[0] === 'd')?.[1] !== d) return;
+      if (!verifyNostrEvent(ev)) { log(`${url}: bad signature; ignored`, 'bad'); return; }
+      const tip = Number(ev.tags.find((t) => t[0] === 'tip')?.[1]);
+      const H = 328; if (!/^[0-9a-f]+$/.test(ev.content) || ev.content.length % H || !Number.isFinite(tip)) return;
+      const n = ev.content.length / H;
+      const win = Array.from({ length: n }, (_, i) => { const hex = ev.content.slice(i * H, (i + 1) * H); const h = s.k.codec.decode('BlockHeader', hex); return { height: tip - n + 1 + i, hex, hash: s.k.codec.blockHash(h), prev: h.prevBlockHash }; });
+      consider(s, win, `${url.replace('wss://', '')} (${ev.pubkey.slice(0, 8)}…)`).catch((err) => log(`error: ${err.message}`, 'bad'));
+    };
+    ws.onclose = () => { if (state === s && sockets.includes(ws)) setTimeout(() => { if (state === s) { sockets = sockets.filter((x) => x !== ws); subscribe(net, [url]); } }, 10000); };
+  }
+}
+
+function render() {
+  const s = state; if (!s) return;
+  const n = s.headers.length, tipH = s.startHeight + n - 1;
+  const bytes = s.hexes.reduce((a, h) => a + h.length / 2, 0);
+  const facts = n ? [
+    ['network', `${s.net} · ${NETS[s.net].id} · stream ${NETS[s.net].d}`],
+    ['tip', `<b>${tipH.toLocaleString()}</b> <a href="${NETS[s.net].explorer}${s.hashes.at(-1)}" target="_blank" rel="noopener"><code>${s.hashes.at(-1)}</code></a> · ${fmt(s.headers.at(-1).time)} UTC`],
+    ['headers', `${n.toLocaleString()} from ${s.startHeight.toLocaleString()} · checkpoint ${s.meta.checkpoint.height.toLocaleString()} · first BLAKE2b ${s.k.params.blake2bHeight.toLocaleString()}`],
+    ['chain work', `2^${log2(s.results.at(-1).chainWork)} since ${s.startHeight.toLocaleString()} (${s.results.at(-1).chainWork.toString(16)})`],
+    ['storage', `${bytes.toLocaleString()} bytes in IndexedDB "${DB}" · sources: ${[...new Set(s.from)].join(', ')}`],
+    ['seed', `exported ${esc(s.meta.exported.slice(0, 19).replace('T', ' '))} UTC at tip ${s.meta.tip.height.toLocaleString()}`],
+  ] : [['state', '<span class="bad">no chain</span>']];
+  $('#facts').innerHTML = facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  const tb = $('#tbl tbody'); tb.innerHTML = '';
+  for (let i = n - 1; i >= Math.max(0, n - 12); i--) {
+    const r = s.results[i], h = s.headers[i];
+    const rules = r.results.map((x) => `<span class="${x.ok === true ? 'ok' : x.ok === false ? 'bad' : 'skip'}" title="${esc(x.rule)}${x.error ? ' — ' + esc(x.error) : ''}">${x.ok === true ? '✓' : x.ok === false ? '✗' : '·'}</span>`).join('');
+    tb.insertAdjacentHTML('beforeend', `<tr><td>${r.height.toLocaleString()}</td><td><a href="${NETS[s.net].explorer}${r.hash}" target="_blank" rel="noopener"><code>${r.hash.slice(0, 24)}…</code></a></td><td>${fmt(h.time)}</td><td><code>${h.bits.toString(16)}</code></td><td>${s.hexes[i].length / 2}</td><td class="rules">${rules}</td><td>${esc(s.from[i])}</td></tr>`);
+  }
+}
+
+for (const b of document.querySelectorAll('.nets button[data-net]')) b.onclick = () => {
+  for (const x of document.querySelectorAll('.nets button[data-net]')) x.setAttribute('aria-pressed', String(x === b));
+  current = b.dataset.net; build(current).catch((e) => log(`error: ${e.message}`, 'bad'));
+};
+$('#reset').onclick = async () => { const db = await openDb(); await idbClear(db, current); log('storage cleared; rebuilding'); build(current).catch((e) => log(`error: ${e.message}`, 'bad')); };
+build(current).catch((e) => log(`error: ${e.message}`, 'bad'));
+</script>

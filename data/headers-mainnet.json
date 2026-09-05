@@ -1,0 +1,20 @@
+{
+ "network": "mainnet",
+ "startHeight": 961620,
+ "count": 6320,
+ "bytes": 1034800,
+ "checkpoint": {
+  "height": 961631,
+  "hash": "00000000000000000000807f9dc917442a67910426d79ebb2f8aa2149327ce8a",
+  "note": "last block shared with Bitcoin Core; a hard checkpoint in Knots"
+ },
+ "tip": {
+  "height": 967939,
+  "hash": "0000000000000003125af3fb620ae01c434fd4f57d73c86501f23b5cd4211454"
+ },
+ "extra": {
+  "959616": "0000a03d32cf5172fa1b0614ac95b2bd9e965e644866cfc3f71701000000000000000000723f3173aa33f0644ab1294973f345eb428455c7d0fd7f50bc4252c1c7300d3fda3d656ad43a02170a17b1ae"
+ },
+ "exported": "2026-09-05T14:37:56.281Z",
+ "source": "local Bitcoin Knots node (getblockheader), verified with the schema engine before writing"
+}
