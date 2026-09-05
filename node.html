@@ -78,13 +78,14 @@ const schemas = Object.fromEntries(await Promise.all(['core', 'proof', 'script',
 const overlay = await j(`${CDN}/schema/overlays/knots-blake2b.jsonld`);
 
 // ---- IndexedDB: one store per network, key = height, value = header hex ----
-const DB = 'knots-headers-node';
+const DB = 'knots-node'; // renamed from knots-headers-node when the block stores were added: a new name needs no version upgrade, which a stale tab can block forever
 const openDb = () => new Promise((res, rej) => {
-  const q = indexedDB.open(DB, 2);
+  const q = indexedDB.open(DB, 1);
+  const watchdog = setTimeout(() => log('storage is slow to open: another tab of this page may be holding it; close other copies of this page', 'bad'), 3000);
   q.onupgradeneeded = () => { const d = q.result; for (const n of Object.keys(NETS)) for (const st of [n, n + ':meta', n + ':blocks']) if (!d.objectStoreNames.contains(st)) d.createObjectStore(st); };
-  q.onblocked = () => log('storage upgrade blocked: another tab of this page holds the old database open; close it (or wait, it is asked to let go)', 'bad');
-  q.onsuccess = () => { const d = q.result; d.onversionchange = () => { d.close(); log('another tab upgraded the storage; reload this page', 'bad'); }; res(d); };
-  q.onerror = () => rej(q.error);
+  q.onblocked = () => log('storage open blocked by another tab of this page; close it', 'bad');
+  q.onsuccess = () => { clearTimeout(watchdog); const d = q.result; d.onversionchange = () => { d.close(); log('storage changed in another tab; reload this page', 'bad'); }; res(d); };
+  q.onerror = () => { clearTimeout(watchdog); rej(q.error); };
 });
 const tx = (db, store, mode, fn) => new Promise((res, rej) => { const t = db.transaction(store, mode); const r = fn(t.objectStore(store)); t.oncomplete = () => res(r?.result ?? r); t.onerror = () => rej(t.error); });
 const idbAll = (db, store) => tx(db, store, 'readonly', (s) => s.getAll());
