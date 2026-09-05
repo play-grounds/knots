@@ -73,7 +73,9 @@ const toHex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join(
 const log2 = (n) => n.toString(2).length - 1;
 
 const [{ createKernel }, { knotsBlake2b }, { verifyNostrEvent }] = await Promise.all([import(`${CDN}/codec/kernel.js`), import(`${CDN}/codec/overlays/knots-blake2b.js`), import(`${CDN}/codec/nostr.js`)]);
-const j = async (p) => { const r = await fetch(p); if (!r.ok) throw new Error(`${p}: ${r.status}`); return r.json(); };
+// Files that change (seeds, manifests) are always revalidated; blocks are named by hash and can be cached forever.
+const fresh = (p) => fetch(p, { cache: 'no-cache' });
+const j = async (p) => { const r = await (p.startsWith('http') ? fetch(p) : fresh(p)); if (!r.ok) throw new Error(`${p}: ${r.status}`); return r.json(); };
 const schemas = Object.fromEntries(await Promise.all(['core', 'proof', 'script', 'chain', 'validate'].map(async (n) => [n, await j(`${CDN}/schema/${n}.jsonld`)])));
 const overlay = await j(`${CDN}/schema/overlays/knots-blake2b.jsonld`);
 
@@ -137,7 +139,7 @@ async function build(net) {
   } else {
     if (keys.length) { log(`stored chain does not match the seed (starts ${keys[0]}); rebuilding`, 'bad'); await idbClear(db, net); }
     const t0 = performance.now();
-    const bin = new Uint8Array(await (await fetch(`data/headers-${net}.bin`)).arrayBuffer());
+    const bin = new Uint8Array(await (await fresh(`data/headers-${net}.bin`)).arrayBuffer());
     s.hexes = parseBin(bin);
     source = 'static file';
     log(`fetched data/headers-${net}.bin: ${bin.length.toLocaleString()} bytes, ${s.hexes.length} headers in ${Math.round(performance.now() - t0)} ms`);
@@ -189,7 +191,7 @@ async function append(s, newHexes, from) {
 async function fillFromSeed(s) {
   const tipH = s.startHeight + s.headers.length - 1;
   if (s.meta.tip.height <= tipH) return false;
-  const bin = new Uint8Array(await (await fetch(`data/headers-${s.net}.bin`)).arrayBuffer());
+  const bin = new Uint8Array(await (await fresh(`data/headers-${s.net}.bin`)).arrayBuffer());
   const hexes = parseBin(bin);
   const newer = hexes.slice(tipH + 1 - s.meta.startHeight);
   if (!newer.length) return false;
