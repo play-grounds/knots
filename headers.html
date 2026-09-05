@@ -62,13 +62,24 @@ const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt
 const fmt = (t) => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
 const age = (t) => { const s = Math.max(0, Math.floor(Date.now() / 1000) - t); return s < 90 ? `${s}s` : s < 5400 ? `${Math.round(s / 60)}m` : `${(s / 3600).toFixed(1)}h`; };
 
-const [{ createKernel }, { knotsBlake2b }, { verifyNostrEvent }] = await Promise.all([
+const [{ headerPanel, attachPanel, PANEL_CSS }, { hashHeaderV2Detailed }, { createKernel }, { knotsBlake2b }, { verifyNostrEvent }] = await Promise.all([import('./src/header-view.js'), import(`${CDN}/codec/pow/knots-header-v2.js`),
   import(`${CDN}/codec/kernel.js`), import(`${CDN}/codec/overlays/knots-blake2b.js`), import(`${CDN}/codec/nostr.js`)]);
 const j = async (p) => (await fetch(`${CDN}/${p}`)).json();
 const schemas = Object.fromEntries(await Promise.all(['core', 'proof', 'chain', 'validate'].map(async (n) => [n, await j(`schema/${n}.jsonld`)])));
 const overlay = await j('schema/overlays/knots-blake2b.jsonld');
 const kernels = {};
 const kernelFor = (net) => (kernels[net] ??= createKernel({ ...schemas, network: NETS[net].id, overlays: [knotsBlake2b(overlay)] }));
+document.head.insertAdjacentHTML('beforeend', `<style>${PANEL_CSS}</style>`);
+const HEADERS = new Map(); // row height -> { header, hash, net }
+document.querySelector('#tbl tbody').addEventListener('click', (e) => {
+  const td = e.target.closest('td.h'); if (!td) return;
+  const tr = td.parentElement, key = tr.dataset.h, item = HEADERS.get(key); if (!item) return;
+  const next = tr.nextElementSibling;
+  if (next?.classList.contains('prow')) { next.remove(); tr.classList.remove('open'); return; }
+  const prow = document.createElement('tr'); prow.className = 'prow';
+  prow.innerHTML = `<td colspan="9">${headerPanel(kernelFor(item.net).codec, item.header, { hash: item.hash, powDetail: hashHeaderV2Detailed })}</td>`;
+  attachPanel(prow); tr.after(prow); tr.classList.add('open');
+});
 
 let current = 'btcb2', best = {}, sockets = [];
 function render(net) {
@@ -87,7 +98,8 @@ function render(net) {
     const h = headers[r.height - startHeight];
     const rules = r.results.map((x) => `<span class="${x.ok === true ? 'ok' : x.ok === false ? 'bad' : 'skip'}" title="${esc(x.rule)}${x.error ? ' — ' + esc(x.error) : ''}">${x.ok === true ? '✓' : x.ok === false ? '✗' : '·'}</span>`).join('');
     const notes = [r.height === k.params.blake2bHeight ? 'fork block' : '', (h.flags & 4) ? `<a href="https://github.com/play-grounds/knots/blob/gh-pages/docs/header-v2.md#time-offset" target="_blank" rel="noopener">time offset</a>${h.timeOffset ? ' +' + h.timeOffset + 's' : ''}` : ''].filter(Boolean).join(', ');
-    tb.insertAdjacentHTML('beforeend', `<tr><td>${r.height.toLocaleString()}</td><td><a href="${NETS[net].explorer}${r.hash}" target="_blank" rel="noopener"><code>${r.hash.slice(0, 24)}…</code></a></td><td>${fmt(h.time)}</td><td>${age(h.time)}</td><td><code>${h.bits.toString(16)}</code></td><td>${k.codec.encode('BlockHeader', h).length}</td><td>${h.txCount ?? '–'}</td><td class="rules">${rules}</td><td>${notes}</td></tr>`);
+    HEADERS.set(`${net}:${r.height}`, { header: h, hash: r.hash, net });
+    tb.insertAdjacentHTML('beforeend', `<tr data-h="${net}:${r.height}"><td class="h" title="show the header bytes">${r.height.toLocaleString()}</td><td><a href="${NETS[net].explorer}${r.hash}" target="_blank" rel="noopener"><code>${r.hash.slice(0, 24)}…</code></a></td><td>${fmt(h.time)}</td><td>${age(h.time)}</td><td><code>${h.bits.toString(16)}</code></td><td>${k.codec.encode('BlockHeader', h).length}</td><td>${h.txCount ?? '–'}</td><td class="rules">${rules}</td><td>${notes}</td></tr>`);
   }
   $('#tbl').hidden = false;
 }

@@ -66,12 +66,23 @@ const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt
 const fmt = (t) => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
 const short = (h) => `<code>${h.slice(0, 24)}…</code>`;
 
-const [{ createKernel }, { knotsBlake2b }] = await Promise.all([import(`${CDN}/codec/kernel.js`), import(`${CDN}/codec/overlays/knots-blake2b.js`)]);
+const [{ headerPanel, attachPanel, PANEL_CSS }, { hashHeaderV2Detailed }, { createKernel }, { knotsBlake2b }] = await Promise.all([import('./src/header-view.js'), import(`${CDN}/codec/pow/knots-header-v2.js`), import(`${CDN}/codec/kernel.js`), import(`${CDN}/codec/overlays/knots-blake2b.js`)]);
 const j = async (p) => (await fetch(p)).json();
 const schemas = Object.fromEntries(await Promise.all(['core', 'proof', 'chain', 'validate'].map(async (n) => [n, await j(`${CDN}/schema/${n}.jsonld`)])));
 const overlay = await j(`${CDN}/schema/overlays/knots-blake2b.jsonld`);
 const kernels = {}, data = {};
 const kernelFor = (net) => (kernels[net] ??= createKernel({ ...schemas, network: NETS[net].id, overlays: [knotsBlake2b(overlay)] }));
+document.head.insertAdjacentHTML('beforeend', `<style>${PANEL_CSS}</style>`);
+const HEADERS = new Map(); // row height -> { header, hash, net }
+document.querySelector('#tbl tbody').addEventListener('click', (e) => {
+  const td = e.target.closest('td.h'); if (!td) return;
+  const tr = td.parentElement, key = tr.dataset.h, item = HEADERS.get(key); if (!item) return;
+  const next = tr.nextElementSibling;
+  if (next?.classList.contains('prow')) { next.remove(); tr.classList.remove('open'); return; }
+  const prow = document.createElement('tr'); prow.className = 'prow';
+  prow.innerHTML = `<td colspan="8">${headerPanel(kernelFor(item.net).codec, item.header, { hash: item.hash, powDetail: hashHeaderV2Detailed })}</td>`;
+  attachPanel(prow); tr.after(prow); tr.classList.add('open');
+});
 
 async function render(net) {
   const k = kernelFor(net);
@@ -93,7 +104,8 @@ async function render(net) {
     if (r.height === d.splitHeight && r.height % 2016 === 0) notes.push(`difficulty period ${r.height / 2016} starts`);
     if (r.height === d.forkHeight) notes.push('first BLAKE2b block');
     if (h.flags & 4) notes.push(`<a href="docs/header-v2.md#time-offset">time offset</a>${h.timeOffset ? ' +' + h.timeOffset + 's' : ''}`);
-    tb.insertAdjacentHTML('beforeend', `<tr class="${cls}${mark}"><td>${r.height.toLocaleString()}</td><td><a href="${NETS[net].explorer}${r.hash}" target="_blank" rel="noopener">${short(r.hash)}</a></td><td>${fmt(h.time)}</td><td><code>${h.bits.toString(16)}</code></td><td>${k.codec.encode('BlockHeader', h).length}</td><td>${meta.nTx}</td><td class="rules">${rules}</td><td>${notes.join('; ')}</td></tr>`);
+    HEADERS.set(`${net}:${r.height}`, { header: h, hash: r.hash, net });
+    tb.insertAdjacentHTML('beforeend', `<tr class="${cls}${mark}" data-h="${net}:${r.height}"><td class="h" title="show the header bytes">${r.height.toLocaleString()}</td><td><a href="${NETS[net].explorer}${r.hash}" target="_blank" rel="noopener">${short(r.hash)}</a></td><td>${fmt(h.time)}</td><td><code>${h.bits.toString(16)}</code></td><td>${k.codec.encode('BlockHeader', h).length}</td><td>${meta.nTx}</td><td class="rules">${rules}</td><td>${notes.join('; ')}</td></tr>`);
   }
   $('#tbl').hidden = false;
 }
