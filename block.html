@@ -1,0 +1,155 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BLAKE2b tip block</title>
+<meta name="description" content="The newest block of each Bitcoin Knots BLAKE2b chain validated in your browser: header rules, block structure, and the contextual rules that need no UTXO set.">
+<link rel="canonical" href="https://play-grounds.github.io/knots/block.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="knots · play-grounds">
+<meta property="og:title" content="BLAKE2b tip block, verified in your tab">
+<meta property="og:description" content="The newest Bitcoin Knots BLAKE2b block, decoded and validated with the bitcoin-desktop schema engine and its Knots overlay. Rules that need a UTXO set are shown as skipped, honestly.">
+<meta property="og:url" content="https://play-grounds.github.io/knots/block.html">
+<meta property="og:image" content="https://play-grounds.github.io/knots/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BLAKE2b tip block, verified in your tab">
+<meta name="twitter:description" content="The newest Bitcoin Knots BLAKE2b block, validated in the browser.">
+<meta name="twitter:image" content="https://play-grounds.github.io/knots/og.png">
+<style>
+  :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fbfbf9; --mute:#6b6b6b; --ok:#1d7f3a; --bad:#b3261e; --skip:#9a9a96; --link:#0b57d0; --shared:#f1efe8; --knots:#fff4dc; --blake:#e6f3ea; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e8e8e4; --bg:#141414; --mute:#9a9a96; --ok:#5fc27a; --bad:#ff7b72; --skip:#6b6b6b; --link:#8ab4f8; --shared:#1c1c1c; --knots:#2a2410; --blake:#12261a; } }
+  a { color: var(--link); }
+  nav.top { display:flex; flex-wrap:wrap; gap: 4px 18px; align-items: baseline; margin: 0 0 18px; font-size: .92rem; } nav.top .brand { font-weight: 600; margin-right: 6px; } nav.top a { color: var(--link); text-decoration: none; } nav.top a[aria-current] { color: var(--fg); font-weight: 600; border-bottom: 2px solid var(--fg); } nav.top a:hover { text-decoration: underline; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 18px 48px; }
+  h1 { font-size: 1.35rem; margin: 0 0 6px; } .sub { color: var(--mute); margin: 0 0 18px; }
+  .nets { display:flex; gap:8px; margin: 0 0 14px; } .nets button { font:inherit; padding:6px 12px; border:1px solid var(--mute); border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
+  .nets button[aria-pressed=true] { border-color: var(--fg); font-weight: 600; }
+  .status { margin: 0 0 14px; } .status.bad { color: var(--bad); }
+  .status b { font-weight: 600; } .ok { color: var(--ok); } .bad { color: var(--bad); } .skip { color: var(--skip); }
+  .legend { display:flex; flex-wrap: wrap; gap: 14px; font-size: .9rem; color: var(--mute); margin: 0 0 12px; } .legend i { display:inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; border: 1px solid var(--mute); }
+  .wrap { overflow-x: auto; } table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); white-space: nowrap; font-size: .92rem; }
+  th { color: var(--mute); font-weight: 500; }
+  tr.shared td { background: var(--shared); } tr.knots td { background: var(--knots); } tr.blake td { background: var(--blake); }
+  tr.mark td { border-top: 2px solid var(--fg); }
+  td a { color: var(--link); text-decoration: none; border-bottom: 1px dotted var(--link); } td a:hover { text-decoration: none; border-bottom-style: solid; }
+  td.rules span { letter-spacing: 1px; cursor: help; } code { font-size: .88em; } td:last-child { white-space: normal; min-width: 240px; }
+  details { margin-top: 22px; color: var(--mute); font-size: .92rem; } summary { cursor: pointer; }
+  .pills { display:flex; flex-wrap:wrap; gap:6px 8px; margin: 6px 0 14px; }
+  .pill { font-size: .84rem; padding: 3px 9px; border-radius: 12px; border: 1px solid; white-space: nowrap; cursor: help; }
+  .pill.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+  .pill.bad { color: var(--bad); border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); font-weight: 600; }
+  .pill.skip { color: var(--mute); border-style: dashed; }
+  h2 { font-size: 1.05rem; margin: 22px 0 4px; } h2 small { color: var(--mute); font-weight: 400; font-size: .85rem; margin-left: 8px; }
+  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 3px 16px; font-size: .92rem; margin: 6px 0 4px; } .facts dt { color: var(--mute); } .facts dd { margin: 0; overflow-wrap: anywhere; }
+  .verdict { font-size: 1.05rem; margin: 6px 0 2px; }
+  #hdr { margin-top: 8px; }
+</style>
+<main>
+<nav class="top"><a href="index.html" class="brand">knots</a><a href="headers.html">headers</a><a href="boundary.html">fork boundary</a><a href="block.html" aria-current="page">tip block</a><a href="https://github.com/play-grounds/knots/blob/gh-pages/docs/header-v2.md">header v2</a><a href="https://github.com/play-grounds/knots" target="_blank" rel="noopener">source</a></nav>
+  <h1>BLAKE2b tip block, verified in this tab</h1>
+  <p class="sub">The newest block of each Bitcoin Knots BLAKE2b chain, decoded and validated here with the schema engine and its Knots overlay: header rules, block structure, and the contextual rules that need no UTXO set. Rules that need previous outputs are shown as skipped, not as passed. Stage 1: the block is a static snapshot from a Knots node.</p>
+  <div class="nets" role="group" aria-label="network">
+    <button data-net="mainnet" aria-pressed="true">mainnet</button>
+    <button data-net="testnet4" aria-pressed="false">testnet4</button>
+  </div>
+  <div class="status" id="status">loading engine…</div>
+  <div id="out" hidden>
+    <div class="verdict" id="verdict"></div>
+    <dl class="facts" id="facts"></dl>
+    <h2>header rules <small id="hdr-n"></small></h2><div class="pills" id="hdr-rules"></div>
+    <h2>block structure <small id="st-n"></small></h2><div class="pills" id="st-rules"></div>
+    <h2>block context <small id="ctx-n"></small></h2><div class="pills" id="ctx-rules"></div>
+    <h2>header bytes</h2><div id="hdr"></div>
+    <h2>transactions <small id="tx-n"></small></h2>
+    <div class="wrap"><table id="txs"><thead><tr><th>#</th><th>txid</th><th>ins</th><th>outs</th><th>weight</th><th>witness</th><th>note</th></tr></thead><tbody></tbody></table></div>
+  </div>
+  <details><summary>how this works</summary>
+    <p>The page loads <code>data/tip-&lt;network&gt;.json</code>: the raw block, the eleven previous headers, and what the node reported for the block. The engine decodes the block, runs the header rules over the twelve-header window (proof of work, linkage, difficulty, median time past, future time, version, timewarp, the fork rules), the structural rules (coinbase first and only, merkle root, duplicate txids, weight, legacy sigops, per-transaction rules, the committed transaction count, the fork headline), and the contextual rules with an empty UTXO set (BIP 34 height, witness commitment, the reduced-data weight cap). Inputs, fees, scripts, maturity and sequence locks need previous outputs, so they are reported as skipped. What the engine computes is compared with the node's own figures.</p>
+    <p>Engine: <code>bitcoin-desktop/schema@v0.0.25</code> via jsDelivr, unmodified, with the <code>knots-blake2b</code> overlay. Next stages: live tip hash from the NIP-333 stream, block bytes from a source URL of your choice, then a worker. Source: <a href="https://github.com/play-grounds/knots">play-grounds/knots</a>.</p>
+  </details>
+</main>
+<script type="module">
+const PIN = 'v0.0.25';
+const CDN = `https://cdn.jsdelivr.net/gh/bitcoin-desktop/schema@${PIN}`;
+const NETS = {
+  mainnet: { id: 'btc:mainnet-blake2b', explorer: 'https://mempool.guide/block/', tx: 'https://mempool.guide/tx/' },
+  testnet4: { id: 'btc:testnet4-blake2b', explorer: 'https://mempool.guide/testnet4/block/', tx: 'https://mempool.guide/testnet4/tx/' },
+};
+const REDUCED_DATA_MAX_BLOCK_WEIGHT = 800000;
+const $ = (s) => document.querySelector(s);
+const status = (html, cls = '') => { const el = $('#status'); el.className = 'status ' + cls; el.innerHTML = html; };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (t) => new Date(t * 1000).toISOString().slice(0, 19).replace('T', ' ') + ' UTC';
+const age = (t) => { const s = Math.max(0, Math.floor(Date.now() / 1000) - t); return s < 90 ? `${s}s` : s < 5400 ? `${Math.round(s / 60)}m` : s < 172800 ? `${(s / 3600).toFixed(1)}h` : `${(s / 86400).toFixed(1)}d`; };
+const coinbaseTag = (hex) => { let s = ''; for (let i = 0; i < hex.length; i += 2) { const b = parseInt(hex.slice(i, i + 2), 16); s += (b >= 0x20 && b <= 0x7e) ? String.fromCharCode(b) : ' '; } return s.replace(/\s+/g, ' ').trim(); };
+
+const [{ headerPanel, attachPanel, PANEL_CSS }, { hashHeaderV2Detailed }, { createKernel }, { knotsBlake2b }] = await Promise.all([import('./src/header-view.js'), import(`${CDN}/codec/pow/knots-header-v2.js`), import(`${CDN}/codec/kernel.js`), import(`${CDN}/codec/overlays/knots-blake2b.js`)]);
+document.head.insertAdjacentHTML('beforeend', `<style>${PANEL_CSS}</style>`);
+const j = async (p) => { const r = await fetch(p); if (!r.ok) throw new Error(`${p}: ${r.status}`); return r.json(); };
+const schemas = Object.fromEntries(await Promise.all(['core', 'proof', 'script', 'chain', 'validate'].map(async (n) => [n, await j(`${CDN}/schema/${n}.jsonld`)])));
+const overlay = await j(`${CDN}/schema/overlays/knots-blake2b.jsonld`);
+const kernels = {};
+const kernelFor = (net) => (kernels[net] ??= createKernel({ ...schemas, network: NETS[net].id, overlays: [knotsBlake2b(overlay)] }));
+
+const pills = (el, results) => {
+  el.innerHTML = results.map((r) => `<span class="pill ${r.ok === true ? 'ok' : r.ok === false ? 'bad' : 'skip'}" title="${esc(r.rule)}${r.error ? ' — ' + esc(r.error) : r.ok === null ? ' — not checkable here (needs previous outputs or chain state)' : ''}">${r.ok === true ? '✓' : r.ok === false ? '✗' : '·'} ${esc(r.label ?? r.rule)}</span>`).join('');
+  const n = results.length, ok = results.filter((r) => r.ok === true).length, bad = results.filter((r) => r.ok === false).length, skip = n - ok - bad;
+  return { n, ok, bad, skip, text: `${ok} pass${bad ? `, <b class="bad">${bad} fail</b>` : ''}${skip ? `, ${skip} skipped` : ''} of ${n}` };
+};
+
+async function render(net) {
+  status('loading snapshot…');
+  const k = kernelFor(net);
+  const d = await j(`data/tip-${net}.json`);
+  const t0 = performance.now();
+  const block = k.codec.decode('Block', d.block);
+  const headers = [...d.prevHeaders.map((h) => k.codec.decode('BlockHeader', h)), block.header];
+  const startHeight = d.height - 11;
+  const chain = k.headers.validateChain(headers, { startHeight, now: Math.floor(Date.now() / 1000) });
+  const hdr = chain.at(-1);
+  const st = k.blocks.validateBlockStructure(block);
+  const ctx = k.blocks.validateBlockContext(block, { height: d.height, mtp: d.prevMediantime });
+  const ms = Math.round(performance.now() - t0);
+  const hash = k.codec.blockHash(block.header);
+  const weight = k.blocks.blockWeight(block);
+  const merkle = k.codec.merkleRoot(block.transactions.map((t) => k.codec.txid(t)));
+  const H = pills($('#hdr-rules'), hdr.results), S = pills($('#st-rules'), st.results), C = pills($('#ctx-rules'), ctx.results);
+  $('#hdr-n').innerHTML = H.text; $('#st-n').innerHTML = S.text; $('#ctx-n').innerHTML = C.text;
+  const fails = H.bad + S.bad + C.bad;
+  const agree = hash === d.hash && block.transactions.length === d.node.nTx && weight === d.node.weight && merkle === d.node.merkleroot && block.header.time === d.node.time;
+  $('#verdict').innerHTML = fails ? `<span class="bad">✗ ${fails} rule failure${fails > 1 ? 's' : ''}</span>` : `<span class="ok">✓ valid</span> under every rule checkable without a UTXO set${agree ? ', and the node agrees on hash, tx count, weight, merkle root and time' : ', <span class="bad">but the node disagrees</span>'}`;
+  const cb = block.transactions[0];
+  const tag = coinbaseTag(cb.inputs[0].scriptSig);
+  const v2 = (block.header.version >>> 31) === 1;
+  const facts = [
+    ['height', d.height.toLocaleString()],
+    ['hash', `<a href="${NETS[net].explorer}${hash}" target="_blank" rel="noopener"><code>${hash}</code></a>`],
+    ['time', `${fmt(block.header.time)} (${age(block.header.time)} ago)${v2 && (block.header.flags & 4) ? ` · time offset ${block.header.timeOffset}s` : ''}`],
+    ['transactions', `${block.transactions.length}${v2 ? ` · header commits to ${block.header.txCount}` : ''}`],
+    ['weight', `${weight.toLocaleString()} WU of ${REDUCED_DATA_MAX_BLOCK_WEIGHT.toLocaleString()} (reduced-data cap) · ${(d.block.length / 2).toLocaleString()} bytes`],
+    ['merkle root', `<code>${merkle}</code>`],
+    ['coinbase', `${esc(tag) || '(no printable tag)'} · ${cb.outputs.length} output${cb.outputs.length === 1 ? '' : 's'} · ${(cb.outputs.reduce((a, o) => a + Number(o.value), 0) / 1e8).toFixed(8)} coins out`],
+    ['snapshot', `exported ${esc(d.exported.slice(0, 19).replace('T', ' '))} UTC from a ${esc(net)} Knots node · validated here in ${ms} ms`],
+  ];
+  $('#facts').innerHTML = facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  const hv = $('#hdr'); hv.innerHTML = headerPanel(k.codec, block.header, { hash, powDetail: hashHeaderV2Detailed }); attachPanel(hv);
+  const MAX = 50;
+  const tb = $('#txs tbody'); tb.innerHTML = '';
+  block.transactions.slice(0, MAX).forEach((tx, i) => {
+    const txid = k.codec.txid(tx), wit = Array.isArray(tx.witness) && tx.witness.some((w) => w.length > 0);
+    const note = i === 0 ? 'coinbase' : '';
+    tb.insertAdjacentHTML('beforeend', `<tr><td>${i}</td><td><a href="${NETS[net].tx}${txid}" target="_blank" rel="noopener"><code>${txid.slice(0, 24)}…</code></a></td><td>${tx.inputs.length}</td><td>${tx.outputs.length}</td><td>${k.codec.txWeight(tx).toLocaleString()}</td><td>${wit ? 'yes' : '–'}</td><td>${note}</td></tr>`);
+  });
+  $('#tx-n').textContent = block.transactions.length > MAX ? `first ${MAX} of ${block.transactions.length}` : `${block.transactions.length}`;
+  status(`<b>${net}</b> — tip <b>${d.height.toLocaleString()}</b> · ${block.transactions.length} txs · ${headers.length} headers in the window (${startHeight.toLocaleString()} to ${d.height.toLocaleString()}) · engine ${PIN}`, fails ? 'bad' : '');
+  $('#out').hidden = false;
+}
+for (const b of document.querySelectorAll('.nets button')) b.onclick = () => {
+  for (const x of document.querySelectorAll('.nets button')) x.setAttribute('aria-pressed', String(x === b));
+  render(b.dataset.net).catch((e) => status(esc(e.message), 'bad'));
+};
+render('mainnet').catch((e) => status(esc(e.message), 'bad'));
+</script>

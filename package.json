@@ -4,8 +4,11 @@
   "description": "Browser-side validation for the Bitcoin Knots BLAKE2b hardfork chain, on the bitcoin-kernel engine",
   "type": "module",
   "private": true,
-  "scripts": { "test": "node test/header-v2.test.mjs",
+  "scripts": {
+    "test": "node test/header-v2.test.mjs",
     "live": "node tools/check-live.mjs",
     "smoke": "node tools/smoke-kernel.mjs",
-    "validate": "node tools/validate-tip.mjs" }
+    "validate": "node tools/validate-tip.mjs",
+    "export-tip": "node tools/export-tip.mjs all"
+  }
 }
