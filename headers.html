@@ -19,6 +19,7 @@
   :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fbfbf9; --mute:#6b6b6b; --ok:#1d7f3a; --bad:#b3261e; --skip:#8a7a2a; --line:#e2e2de; --card:#fff; --link:#1a5fb4; }
   @media (prefers-color-scheme: dark) { :root { --fg:#e8e8e4; --bg:#141414; --mute:#9a9a96; --ok:#5fc27a; --bad:#ff7b72; --skip:#d8c25a; --line:#2a2a2a; --card:#1c1c1c; --link:#7cb3ff; } }
   a { color: var(--link); }
+  nav.top { display:flex; flex-wrap:wrap; gap: 4px 18px; align-items: baseline; margin: 0 0 18px; font-size: .92rem; } nav.top .brand { font-weight: 600; margin-right: 6px; } nav.top a { color: var(--link); text-decoration: none; } nav.top a[aria-current] { color: var(--fg); font-weight: 600; border-bottom: 2px solid var(--fg); } nav.top a:hover { text-decoration: underline; }
   body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 system-ui, sans-serif; }
   main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; }
   h1 { font-size: 20px; margin: 0 0 4px; } .sub { color: var(--mute); margin: 0 0 16px; }
@@ -34,6 +35,7 @@
   .rules span { display:inline-block; margin-right: 6px; }
 </style>
 <main>
+<nav class="top"><a href="index.html" class="brand">knots</a><a href="headers.html" aria-current="page">headers</a><a href="boundary.html">fork boundary</a><a href="https://github.com/play-grounds/knots/blob/gh-pages/docs/header-v2.md">header v2</a><a href="https://github.com/play-grounds/knots" target="_blank" rel="noopener">source</a></nav>
   <h1>BLAKE2b chain headers, verified in this tab</h1>
   <p class="sub">The latest twelve headers of the Bitcoin Knots BLAKE2b chains as published over Nostr (NIP-333, kind 33333), decoded and validated here with the schema engine and its Knots overlay: proof of work, linkage, difficulty, version, and the fork rules. The publisher is a convenience, never an authority.</p>
   <div class="nets" role="group" aria-label="network">

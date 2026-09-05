@@ -19,6 +19,7 @@
   :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fbfbf9; --mute:#6b6b6b; --ok:#1d7f3a; --bad:#b3261e; --skip:#9a9a96; --link:#0b57d0; --shared:#f1efe8; --knots:#fff4dc; --blake:#e6f3ea; }
   @media (prefers-color-scheme: dark) { :root { --fg:#e8e8e4; --bg:#141414; --mute:#9a9a96; --ok:#5fc27a; --bad:#ff7b72; --skip:#6b6b6b; --link:#8ab4f8; --shared:#1c1c1c; --knots:#2a2410; --blake:#12261a; } }
   a { color: var(--link); }
+  nav.top { display:flex; flex-wrap:wrap; gap: 4px 18px; align-items: baseline; margin: 0 0 18px; font-size: .92rem; } nav.top .brand { font-weight: 600; margin-right: 6px; } nav.top a { color: var(--link); text-decoration: none; } nav.top a[aria-current] { color: var(--fg); font-weight: 600; border-bottom: 2px solid var(--fg); } nav.top a:hover { text-decoration: underline; }
   html, body { margin: 0; background: var(--bg); color: var(--fg); }
   body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
   main { max-width: 1100px; margin: 0 auto; padding: 28px 18px 48px; }
@@ -38,6 +39,7 @@
   details { margin-top: 22px; color: var(--mute); font-size: .92rem; } summary { cursor: pointer; }
 </style>
 <main>
+<nav class="top"><a href="index.html" class="brand">knots</a><a href="headers.html">headers</a><a href="boundary.html" aria-current="page">fork boundary</a><a href="https://github.com/play-grounds/knots/blob/gh-pages/docs/header-v2.md">header v2</a><a href="https://github.com/play-grounds/knots" target="_blank" rel="noopener">source</a></nav>
   <h1>BLAKE2b fork boundary, verified in this tab</h1>
   <p class="sub">The headers around the point where each Bitcoin Knots BLAKE2b chain left Bitcoin Core's chain, decoded and validated here with the schema engine and its Knots overlay. The headers are a static snapshot from a Knots node; they never change, so nothing is fetched live.</p>
   <div class="nets" role="group" aria-label="network">
