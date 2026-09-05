@@ -164,6 +164,7 @@ async function build(net) {
     else { await idbDelete(db, net + ':blocks', h); }
   }
   if (s.blocks.size) log(`block cache: ${s.blocks.size} blocks, ${s.cacheBytes.toLocaleString()} bytes`);
+  if (source === 'IndexedDB') await fillFromSeed(s);
   render();
   subscribe(net);
   if ($('#auto').checked && s.headers.length) fetchBlock(s, s.startHeight + s.headers.length - 1).catch((e) => log(`error: ${e.message}`, 'bad'));
@@ -182,6 +183,20 @@ async function append(s, newHexes, from) {
   await idbPut(s.db, s.net, newHexes.map((h, i) => [s.startHeight + base + i, h]));
   log(`appended ${hdrs.length} header(s) from ${from}: tip ${(s.startHeight + s.headers.length - 1).toLocaleString()} ${s.hashes.at(-1).slice(0, 24)}…`, 'ok');
   return true;
+}
+
+// The seed file as a gap source: anything in it above our tip is appended (and verified like everything else).
+async function fillFromSeed(s) {
+  const tipH = s.startHeight + s.headers.length - 1;
+  if (s.meta.tip.height <= tipH) return false;
+  const bin = new Uint8Array(await (await fetch(`data/headers-${s.net}.bin`)).arrayBuffer());
+  const hexes = parseBin(bin);
+  const newer = hexes.slice(tipH + 1 - s.meta.startHeight);
+  if (!newer.length) return false;
+  log(`seed file is ahead of the stored chain (${s.meta.tip.height.toLocaleString()} vs ${tipH.toLocaleString()}); taking ${newer.length} header(s) from it`);
+  const ok = await append(s, newer, 'static file');
+  if (ok && $('#auto').checked) fetchBlock(s, s.startHeight + s.headers.length - 1).catch((e) => log(`error: ${e.message}`, 'bad'));
+  return ok;
 }
 
 // Fill heights lo..hi from the static block window: its manifest names height and hash,
@@ -212,7 +227,7 @@ async function consider(s, win, from) {
   }
   if (first > tipH + 1) {
     log(`${from}: gap — event covers ${first}..${last}, our tip is ${tipH}; trying to fill ${first - tipH - 1} header(s) from the static block window`);
-    if (!(await fillGap(s, tipH + 1, first - 1))) { log(`gap not filled; waiting for another source`, 'bad'); return; }
+    if (!(await fillFromSeed(s)) && !(await fillGap(s, tipH + 1, first - 1))) { log(`gap not filled; waiting for another source`, 'bad'); return; }
     return consider(s, win, from);
   }
   // common prefix
