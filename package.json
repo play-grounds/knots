@@ -11,6 +11,7 @@
     "validate": "node tools/validate-tip.mjs",
     "export-tip": "node tools/export-tip.mjs all",
     "export-headers": "node tools/export-headers.mjs all",
-    "export-blocks": "node tools/export-blocks.mjs all"
+    "export-blocks": "node tools/export-blocks.mjs all",
+    "export-epochs": "node tools/export-epochs.mjs all"
   }
 }
