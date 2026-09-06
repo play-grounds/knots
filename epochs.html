@@ -3,35 +3,59 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>BLAKE2b epochs</title>
+<meta name="description" content="The difficulty epochs of the Bitcoin Knots BLAKE2b chains since the split from Bitcoin Core, one sealed headers file per epoch, verified in your browser.">
+<link rel="canonical" href="https://play-grounds.github.io/knots/epochs.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="knots · play-grounds">
+<meta property="og:title" content="BLAKE2b epochs, sealed and verified in your tab">
+<meta property="og:description" content="One headers file per difficulty epoch of the Bitcoin Knots BLAKE2b chains (mainnet and testnet4) since the split from Bitcoin Core. Sealed once, hashed, and verified in the browser with the bitcoin-desktop schema engine.">
+<meta property="og:url" content="https://play-grounds.github.io/knots/epochs.html">
+<meta property="og:image" content="https://play-grounds.github.io/knots/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BLAKE2b epochs, sealed and verified in your tab">
+<meta name="twitter:description" content="One headers file per epoch of the Bitcoin Knots BLAKE2b chains, verified in the browser.">
+<meta name="twitter:image" content="https://play-grounds.github.io/knots/og.png">
 <style>
-  :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fbfbf9; --mute:#6b6b6b; --ok:#1d7f3a; --bad:#b3261e; --skip:#9a9a96; --link:#0b57d0; --bar:#4a90e2; }
-  @media (prefers-color-scheme: dark) { :root { --fg:#e8e8e4; --bg:#141414; --mute:#9a9a96; --ok:#5fc27a; --bad:#ff7b72; --skip:#6b6b6b; --link:#8ab4f8; --bar:#6fa8f0; } }
+  :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fbfbf9; --mute:#6b6b6b; --ok:#1d7f3a; --bad:#b3261e; --link:#0b57d0; --bar:#4a90e2; --card:#ffffff; --line: #e4e2dc; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e8e8e4; --bg:#141414; --mute:#9a9a96; --ok:#5fc27a; --bad:#ff7b72; --link:#8ab4f8; --bar:#6fa8f0; --card:#1c1c1c; --line:#2a2a2a; } }
   html, body { margin: 0; background: var(--bg); color: var(--fg); } a { color: var(--link); }
   body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 1100px; margin: 0 auto; padding: 28px 18px 48px; }
-  h1 { font-size: 1.35rem; margin: 0 0 6px; } .sub { color: var(--mute); margin: 0 0 18px; }
-  .nets { display:flex; gap:8px; margin: 0 0 14px; } .nets button { font:inherit; padding:6px 12px; border:1px solid var(--mute); border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 18px 56px; }
+  h1 { font-size: 1.5rem; margin: 0 0 6px; letter-spacing: -.01em; } .sub { color: var(--mute); margin: 0 0 20px; max-width: 70ch; }
+  .nets { display:flex; gap:8px; margin: 0 0 16px; } .nets button { font:inherit; padding:6px 14px; border:1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--fg); cursor: pointer; }
   .nets button[aria-pressed=true] { border-color: var(--fg); font-weight: 600; }
-  .status { margin: 0 0 14px; color: var(--mute); } .ok { color: var(--ok); } .bad { color: var(--bad); }
-  .wrap { overflow-x: auto; } table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-  th, td { text-align: left; padding: 6px 6px; border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); white-space: nowrap; font-size: .88rem; vertical-align: top; }
-  th { color: var(--mute); font-weight: 500; } code { font-size: .88em; }
-  .bar { width: 120px; height: 8px; background: color-mix(in srgb, var(--fg) 10%, transparent); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; } .bar i { display:block; height: 100%; background: var(--bar); }
-  tr.current td { background: color-mix(in srgb, var(--bar) 8%, transparent); }
-  button.v { font: inherit; font-size: .85rem; padding: 3px 10px; border: 1px solid var(--mute); border-radius: 5px; background: transparent; color: var(--fg); cursor: pointer; }
-  td.res { white-space: normal; min-width: 170px; color: var(--mute); font-size: .86rem; }
-  .note { color: var(--mute); font-size: .86rem; }
-  details { margin-top: 22px; color: var(--mute); font-size: .92rem; } summary { cursor: pointer; }
+  .status { margin: 0 0 18px; color: var(--mute); font-size: .95rem; } .status b { color: var(--fg); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .cards { display: grid; gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px 16px; }
+  .card.current { border-color: color-mix(in srgb, var(--bar) 55%, var(--line)); }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 4px; }
+  .head .n { font-size: 1.15rem; font-weight: 650; } .head .n small { color: var(--mute); font-weight: 400; font-size: .85rem; margin-left: 6px; }
+  .badge { font-size: .75rem; padding: 2px 9px; border-radius: 999px; border: 1px solid; letter-spacing: .02em; }
+  .badge.sealed { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 9%, transparent); }
+  .badge.live { color: var(--bar); border-color: color-mix(in srgb, var(--bar) 55%, transparent); background: color-mix(in srgb, var(--bar) 10%, transparent); }
+  .head .right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  button.v { font: inherit; font-size: .85rem; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--fg); cursor: pointer; } button.v:hover { border-color: var(--fg); }
+  .res { font-size: .86rem; color: var(--mute); max-width: 46ch; }
+  .notes { color: var(--mute); font-size: .86rem; margin: 0 0 10px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 22px; font-size: .9rem; }
+  .facts div { min-width: 0; } .facts dt { color: var(--mute); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; } .facts dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  .bar { width: 100%; height: 6px; background: color-mix(in srgb, var(--fg) 10%, transparent); border-radius: 3px; overflow: hidden; display: block; margin-top: 6px; } .bar i { display:block; height: 100%; background: var(--bar); }
+  .bar.full i { background: var(--ok); }
+  code { font-size: .88em; } .nw { white-space: nowrap; } .sm { color: var(--mute); font-size: .82rem; }
+  .note { color: var(--mute); font-size: .86rem; margin-top: 16px; }
+  details { margin-top: 22px; color: var(--mute); font-size: .92rem; max-width: 80ch; } summary { cursor: pointer; }
 </style>
 <main>
   <h1>BLAKE2b epochs</h1>
-  <p class="sub">The difficulty epochs of each Bitcoin Knots BLAKE2b chain since the split from Bitcoin Core, one headers file per epoch. A complete epoch is sealed once and never changes. Verify any epoch here: the page fetches its file and runs every header rule in this tab. Unlinked experiment.</p>
+  <p class="sub">The difficulty epochs of each Bitcoin Knots BLAKE2b chain since the split from Bitcoin Core, one headers file per epoch. A complete epoch is sealed once and never changes. Verify any epoch here: the page fetches its file and runs every header rule in this tab.</p>
   <div class="nets" role="group" aria-label="network">
     <button data-net="mainnet" aria-pressed="true">mainnet</button>
     <button data-net="testnet4" aria-pressed="false">testnet4</button>
   </div>
   <div class="status" id="status">loading engine…</div>
-  <div class="wrap"><table id="tbl"><thead><tr><th>epoch</th><th>heights</th><th>blocks</th><th>from (UTC)</th><th>to (UTC)</th><th>bits</th><th>headers file</th><th>sha-256</th><th>verify</th><th>result</th></tr></thead><tbody></tbody></table></div>
+  <div class="cards" id="cards"></div>
   <p class="note" id="note"></p>
   <details><summary>how this works</summary>
     <p>An epoch is 2,016 blocks, the difficulty retarget interval. <code>data/epochs/&lt;net&gt;/index.json</code> lists every epoch from the one containing the split; <code>data/epochs/&lt;net&gt;/&lt;n&gt;.bin</code> holds that epoch's headers in height order, 80 bytes before the BLAKE2b fork and 164 from it. The index also carries the eleven headers before each epoch and whatever earlier headers the difficulty rules need, so an epoch can be verified on its own. Sealed epochs are written once; their SHA-256 is the thing to compare across hosts. The current epoch is rewritten as blocks arrive.</p>
@@ -62,28 +86,33 @@ function parseBin(bytes) {
 }
 
 async function render(net) {
-  current = net; $('#status').textContent = 'loading index…'; $('#tbl tbody').innerHTML = ''; $('#note').textContent = '';
+  current = net; $('#status').textContent = 'loading index…'; $('#cards').innerHTML = ''; $('#note').textContent = '';
   const k = kernelFor(net);
   index = await j(`data/epochs/${net}/index.json`);
-  const gate = net === 'testnet4' ? ' · ends at 151,199, the retarget gate' : '';
-  $('#status').innerHTML = `<b>${net}</b> · split after ${index.lastShared.toLocaleString()}, first BLAKE2b block ${k.params.blake2bHeight.toLocaleString()} · ${index.epochs.length} epoch${index.epochs.length === 1 ? '' : 's'} since the split, ${index.epochs.filter((e) => e.complete).length} sealed · node tip ${index.tip.toLocaleString()} at export, ${esc(index.updated.slice(0, 16).replace('T', ' '))} UTC${gate}`;
-  const tb = $('#tbl tbody');
-  for (const e of index.epochs) {
+  const sealed = index.epochs.filter((e) => e.complete).length;
+  $('#status').innerHTML = `<b>${net}</b> · last shared block ${index.lastShared.toLocaleString()}, first BLAKE2b block ${k.params.blake2bHeight.toLocaleString()} · ${index.epochs.length} epoch${index.epochs.length === 1 ? '' : 's'} since the split, ${sealed} sealed · node tip ${index.tip.toLocaleString()} at export, ${esc(index.updated.slice(0, 16).replace('T', ' '))} UTC`;
+  const box = $('#cards');
+  for (const e of [...index.epochs].reverse()) {
     const pct = (e.count / index.interval * 100).toFixed(1);
     const notes = [];
-    if (e.start === index.lastShared + 1) notes.push(`starts at the split: last shared block is ${index.lastShared.toLocaleString()}`);
-    else if (e.start <= index.lastShared && e.end >= index.lastShared) notes.push(`split after ${index.lastShared.toLocaleString()}`);
-    if (e.v2From != null && e.v2From === k.params.blake2bHeight) notes.push(`BLAKE2b from ${e.v2From.toLocaleString()}`);
-    if (!e.complete) notes.push('in progress');
-    tb.insertAdjacentHTML('beforeend', `<tr class="${e.complete ? '' : 'current'}" data-n="${e.n}">
-      <td><b>${e.n}</b>${notes.length ? `<br><span class="note">${notes.join(' · ')}</span>` : ''}</td>
-      <td><a href="${NETS[net].explorer}${e.firstHash}" target="_blank" rel="noopener">${e.start.toLocaleString()}</a> – <a href="${NETS[net].explorer}${e.lastHash}" target="_blank" rel="noopener">${e.end.toLocaleString()}</a></td>
-      <td><span class="bar"><i style="width:${pct}%"></i></span>${e.count.toLocaleString()} / ${index.interval.toLocaleString()}</td>
-      <td>${fmt(e.firstTime)}</td><td>${fmt(e.lastTime)}<br><span class="note">${days(e.firstTime, e.lastTime)} days</span></td>
-      <td><code>${e.firstBits}</code>${e.lastBits !== e.firstBits ? `<br><code>${e.lastBits}</code>` : ''}</td>
-      <td><a href="data/epochs/${net}/${e.file}">${e.file}</a><br><span class="note">${e.bytes.toLocaleString()} bytes</span></td>
-      <td><code title="${e.sha256}">${e.sha256.slice(0, 12)}…</code>${e.sealed ? `<br><span class="note">sealed ${esc(e.sealed.slice(0, 10))}</span>` : ''}</td>
-      <td><button class="v" data-n="${e.n}">verify</button></td><td class="res" id="res-${e.n}"></td></tr>`);
+    if (e.start === index.lastShared + 1) notes.push(`starts at the split; the last block shared with Core is ${index.lastShared.toLocaleString()}`);
+    else if (e.start <= index.lastShared && e.end >= index.lastShared) notes.push(`the split is inside this epoch, after ${index.lastShared.toLocaleString()}`);
+    if (e.v2From != null && e.v2From === k.params.blake2bHeight) notes.push(`BLAKE2b headers from ${e.v2From.toLocaleString()}`);
+    if (net === 'testnet4' && e.end + 1 === (e.n + 1) * index.interval && !e.complete) notes.push(`ends at ${((e.n + 1) * index.interval - 1).toLocaleString()}, the retarget gate`);
+    box.insertAdjacentHTML('beforeend', `<section class="card ${e.complete ? '' : 'current'}" data-n="${e.n}">
+      <div class="head"><span class="n">epoch ${e.n}<small>${e.start.toLocaleString()} – ${(e.n * index.interval + index.interval - 1).toLocaleString()}</small></span>
+        <span class="badge ${e.complete ? 'sealed' : 'live'}">${e.complete ? 'sealed ' + esc(e.sealed.slice(0, 10)) : 'in progress'}</span>
+        <span class="right"><span class="res" id="res-${e.n}"></span><button class="v" data-n="${e.n}">verify</button></span></div>
+      ${notes.length ? `<p class="notes">${notes.join(' · ')}</p>` : ''}
+      <dl class="facts">
+        <div><dt>blocks</dt><dd>${e.count.toLocaleString()} of ${index.interval.toLocaleString()}<span class="bar ${e.complete ? 'full' : ''}"><i style="width:${pct}%"></i></span></dd></div>
+        <div><dt>first · last</dt><dd><a href="${NETS[net].explorer}${e.firstHash}" target="_blank" rel="noopener">${e.start.toLocaleString()}</a> · <a href="${NETS[net].explorer}${e.lastHash}" target="_blank" rel="noopener">${e.end.toLocaleString()}</a></dd></div>
+        <div><dt>span (UTC)</dt><dd><span class="nw">${fmt(e.firstTime)}</span> →<br><span class="nw">${fmt(e.lastTime)}</span> <span class="sm">· ${days(e.firstTime, e.lastTime)} days</span></dd></div>
+        <div><dt>bits</dt><dd><code>${e.firstBits}</code>${e.lastBits !== e.firstBits ? ` → <code>${e.lastBits}</code>` : ''}</dd></div>
+        <div><dt>headers file</dt><dd><a href="data/epochs/${net}/${e.file}">${e.file}</a> <span class="sm">${e.bytes.toLocaleString()} bytes</span></dd></div>
+        <div><dt>sha-256</dt><dd><code title="${e.sha256}">${e.sha256.slice(0, 16)}…</code></dd></div>
+      </dl>
+    </section>`);
   }
   $('#note').textContent = `Headers only: ${index.epochs.reduce((a, e) => a + e.bytes, 0).toLocaleString()} bytes for every epoch since the split. Block archives per epoch are the next step and do not live in this repo.`;
 }
@@ -112,6 +141,6 @@ async function verify(net, n) {
 }
 
 for (const b of document.querySelectorAll('.nets button')) b.onclick = () => { for (const x of document.querySelectorAll('.nets button')) x.setAttribute('aria-pressed', String(x === b)); render(b.dataset.net).catch((e) => { $('#status').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }); };
-$('#tbl').addEventListener('click', (ev) => { const b = ev.target.closest('button.v'); if (b) verify(current, Number(b.dataset.n)).catch((e) => { $(`#res-${b.dataset.n}`).innerHTML = `<span class="bad">${esc(e.message)}</span>`; }); });
+$('#cards').addEventListener('click', (ev) => { const b = ev.target.closest('button.v'); if (b) verify(current, Number(b.dataset.n)).catch((e) => { $(`#res-${b.dataset.n}`).innerHTML = `<span class="bad">${esc(e.message)}</span>`; }); });
 render('mainnet').catch((e) => { $('#status').innerHTML = `<span class="bad">${esc(e.message)}</span>`; });
 </script>
