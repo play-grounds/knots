@@ -90,7 +90,7 @@
     <section class="card"><h2 id="h-share">share of blocks</h2><div class="donutwrap"><svg class="donut" viewBox="0 0 200 200" role="img" aria-labelledby="h-share" id="donut"></svg><ul class="legend" id="legend"></ul></div></section>
     <section class="card"><h2>blocks by pool</h2><div class="bars" id="bars"></div><p class="note" id="barsnote"></p></section>
   </div>
-  <section class="card"><h2 id="h-strip">the blocks, oldest to newest</h2><div class="strip" id="strip"></div></section>
+  <section class="card"><h2 id="h-strip">the blocks, newest first</h2><div class="strip" id="strip"></div></section>
   <section class="card"><h2>wider horizons</h2><div class="hz" id="hz"></div><div class="hzlegend" id="hzlegend"></div><p class="note">The last 12 and 48 rows are this page's own counts, as is the row for the window above when it is a different one; the 24 hour, week and month rows are mempool.guide's pool counts. The seven colours belong to the week's seven biggest pools, so a pool keeps its colour across windows; every other pool is grey and named on hover and in the table.</p></section>
   <section class="card"><h2>block list</h2><p class="note" id="tblnote" style="margin:0 0 8px"></p><div class="wrap"><table id="tbl"><thead><tr><th>height</th><th>time (UTC)</th><th>age</th><th>pool</th><th>coinbase says</th><th class="n">txs</th><th class="n">reward</th><th class="n">fees</th><th class="n">size</th></tr></thead><tbody></tbody></table></div></section>
   <details><summary>how this works</summary>
@@ -257,7 +257,7 @@ function render() {
   const note = $('#epochnote'); note.hidden = !isEpoch;
   if (isEpoch) { const done = arr.length, left = from + INTERVAL - 1 - tip; note.replaceChildren(el('b', {}, `epoch ${epochN}`), ` · blocks ${from.toLocaleString()} – ${(from + INTERVAL - 1).toLocaleString()} · ${win === 'this' ? `${done.toLocaleString()} of ${INTERVAL.toLocaleString()} mined, ${left.toLocaleString()} to go${left * (s.interval || 240) < 86400 * 2 ? ` (about ${Math.max(1, Math.round(left * (s.interval || 240) / 3600))} h at the current pace)` : ''}` : `sealed, ${done.toLocaleString()} blocks`}${win === 'this' && done <= 24 ? ' · a fresh slate: this epoch has just begun' : ''}${epochN === FORK_EPOCH ? ` · the epoch of the split: ${LAST_SHARED.toLocaleString()} is the last block shared with Bitcoin Core, ${(LAST_SHARED + 1).toLocaleString()} – ${(BLAKE_FROM - 1).toLocaleString()} are Knots-only SHA256d blocks, BLAKE2b headers from ${BLAKE_FROM.toLocaleString()}` : ''}`, el('div', { class: 'prog' }, el('i', { style: `width:${(done / INTERVAL * 100).toFixed(1)}%` }))); }
   const label = isEpoch ? `epoch ${epochN}` : `last ${want}`;
-  $('#status').replaceChildren(el('b', {}, 'mainnet'), ` · tip ${tip.toLocaleString()} · last block ${age(blocks.get(tip)?.time ?? arr[0].time)} ago · ${loading || (short ? `${arr.length.toLocaleString()} of ${want.toLocaleString()} blocks loaded` : `${arr.length.toLocaleString()} blocks, ${fmt(arr.at(-1).time)} → ${fmt(arr[0].time)} UTC, ${s.span >= 172800 ? (s.span / 86400).toFixed(1) + ' days' : (s.span / 3600).toFixed(1) + ' h'}`)} · epoch ${epochOf(tip)}: ${(tip - epochOf(tip) * INTERVAL + 1).toLocaleString()} of ${INTERVAL.toLocaleString()}, ${((epochOf(tip) + 1) * INTERVAL - 1 - tip).toLocaleString()} to go · chain ${linked(arr) ? 'links' : 'has a gap'} `,
+  $('#status').replaceChildren(el('b', {}, 'mainnet'), ` · tip ${tip.toLocaleString()} · last block ${age(blocks.get(tip)?.time ?? arr[0].time)} ago · ${loading || (short ? `${arr.length.toLocaleString()} of ${want.toLocaleString()} blocks loaded` : `${arr.length.toLocaleString()} blocks, ${fmt(arr.at(-1).time)} → ${fmt(arr[0].time)} UTC, ${s.span >= 172800 ? (s.span / 86400).toFixed(1) + ' days' : (s.span / 3600).toFixed(1) + ' h'}`)} · epoch ${epochOf(tip)}: ${(tip - epochOf(tip) * INTERVAL + 1).toLocaleString()} of ${INTERVAL.toLocaleString()}, `, el('b', {}, `${((epochOf(tip) + 1) * INTERVAL - 1 - tip).toLocaleString()} to go`), ` · chain ${linked(arr) ? 'links' : 'has a gap'} `,
     el('span', { class: linked(arr) ? 'ok' : 'bad' }, linked(arr) ? '✓' : '✗'), nipTip ? ` · NIP-333 relays say tip ${nipTip.toLocaleString()} ` : '', nipTip ? el('span', { class: Math.abs(nipTip - tip) <= 1 ? 'ok' : 'bad' }, Math.abs(nipTip - tip) <= 1 ? '✓' : `(${nipTip - tip > 0 ? '+' : ''}${nipTip - tip})`) : '');
 
   // KPIs
@@ -308,8 +308,8 @@ function render() {
 
   // strip, oldest -> newest
   const strip = $('#strip'); strip.replaceChildren(); strip.style.setProperty('--tile', arr.length > 48 ? '44px' : arr.length > 12 ? '58px' : '64px'); strip.classList.toggle('mosaic', arr.length > 144);
-  $('#h-strip').textContent = isEpoch ? `epoch ${epochN}, block by block, oldest to newest` : `the last ${s.n} blocks, oldest to newest`;
-  for (const b of [...arr].reverse()) {
+  $('#h-strip').textContent = isEpoch ? `epoch ${epochN}, block by block, newest first` : `the last ${s.n} blocks, newest first`;
+  for (const b of arr) { // newest first, like mempool.guide
     const t = el('a', { class: 'tile' + (b.hash === newest ? ' new' : ''), href: EXPLORER + b.hash, target: '_blank', rel: 'noopener' }, el('b', { style: `background:${colorOf(b.pool)}` }), el('span', { class: 'p', title: b.pool }, arr.length > 48 ? initials(b.pool) : b.pool), el('span', { class: 'h' }, arr.length > 48 ? String(b.height % 1000).padStart(3, '0') : b.height.toLocaleString()));
     hover(t, () => [[b.pool, `block ${b.height.toLocaleString()}`], [`${age(b.time)} ago`, fmt(b.time) + ' UTC'], [b.tag || 'no coinbase text', ''], [`${b.txs} tx · ${btc(b.fees)} BTC fees`, `${(b.size / 1024).toFixed(0)} KB`]]);
     strip.append(t);
