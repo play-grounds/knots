@@ -52,7 +52,11 @@
   .strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--tile, 68px), 1fr)); gap: 6px; }
   .tile { border-radius: 8px; border: 1px solid var(--line); padding: 6px 0 5px; text-align: center; cursor: pointer; position: relative; overflow: hidden; background: var(--card); text-decoration: none; color: var(--fg); display: block; }
   .tile b { display: block; font-weight: normal; height: 6px; border-radius: 3px; margin: 0 8px 5px; } .tile .h { display: block; font-size: .74rem; color: var(--mute); font-variant-numeric: tabular-nums; } .tile .p { display: block; font-size: .72rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
-  .tile.new { animation: arrive .9s ease-out; } @keyframes arrive { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .tile.new { animation: arrive 3s ease-out; } @keyframes arrive { 0% { transform: translateX(-18px); opacity: 0; box-shadow: 0 0 0 0 color-mix(in srgb, var(--s1) 70%, transparent); } 18% { transform: none; opacity: 1; box-shadow: 0 0 0 5px color-mix(in srgb, var(--s1) 55%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
+  .strip.mosaic .tile.new { animation: arrive-sq 3s ease-out; } @keyframes arrive-sq { 0% { transform: scale(.4); box-shadow: 0 0 0 0 color-mix(in srgb, var(--s1) 70%, transparent); } 25% { transform: scale(1.25); box-shadow: 0 0 0 4px color-mix(in srgb, var(--s1) 55%, transparent); } 100% { transform: none; box-shadow: 0 0 0 8px transparent; } }
+  .latest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 14px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); font-size: .92rem; } .latest .sw { width: 11px; height: 11px; border-radius: 3px; flex: none; } .latest b { font-weight: 650; } .latest .ago { color: var(--mute); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .latest.flash { animation: flash 2.6s ease-out; } @keyframes flash { 0% { background: color-mix(in srgb, var(--s1) 28%, var(--card)); border-color: var(--s1); transform: translateY(-4px); } 35% { background: color-mix(in srgb, var(--s1) 16%, var(--card)); border-color: var(--s1); transform: none; } 100% { background: var(--card); border-color: var(--line); } }
+  .latest .tag { color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; } .latest .newpill { font-size: .74rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--s1); border: 1px solid color-mix(in srgb, var(--s1) 55%, transparent); border-radius: 999px; padding: 1px 8px; opacity: 0; transition: opacity .4s; } .latest.flash .newpill { opacity: 1; }
   .tile:hover { border-color: var(--fg); }
   .strip.mosaic { grid-template-columns: repeat(auto-fill, 14px); gap: 3px; } .strip.mosaic .tile { padding: 0; height: 14px; border: 0; border-radius: 3px; } .strip.mosaic .tile b { height: 100%; margin: 0; border-radius: 3px; } .strip.mosaic .tile .p, .strip.mosaic .tile .h { display: none; }
   .epochnote { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--s1) 10%, var(--card)); border: 1px solid color-mix(in srgb, var(--s1) 40%, var(--line)); font-size: .92rem; }
@@ -85,6 +89,7 @@
   </div>
   <div class="status" id="status">loading…</div>
   <div class="epochnote" id="epochnote" hidden></div>
+  <div class="latest" id="latest" hidden></div>
   <section class="kpis" id="kpis" aria-live="polite"></section>
   <div class="grid2">
     <section class="card"><h2 id="h-share">share of blocks</h2><div class="donutwrap"><svg class="donut" viewBox="0 0 200 200" role="img" aria-labelledby="h-share" id="donut"></svg><ul class="legend" id="legend"></ul></div></section>
@@ -132,7 +137,7 @@ const colors = lsGet(LS.colors, {});                                     // pool
 let horizons = lsGet(LS.horizons, null);                                  // { at, '24h': {...}, '1w': {...}, '1m': {...} }
 let win = /^(12|48|144|this|e:\d+)$/.test(lsGet(LS.window, '12')) ? lsGet(LS.window, '12') : '12';
 const seeded = new Set();
-let tip = Math.max(0, ...blocks.keys()), nipTip = 0, liveVia = '', newest = null, ws = null, loading = '';
+let tip = Math.max(0, ...blocks.keys()), nipTip = 0, liveVia = '', newest = null, ws = null, loading = '', flashed = null;
 
 function persist() {
   const arr = [...blocks.values()].sort((a, b) => b.height - a.height).slice(0, CACHE_MAX); // newest blocks go to local storage; older epochs stay in memory and come from their seed files
@@ -257,6 +262,12 @@ function render() {
   const note = $('#epochnote'); note.hidden = !isEpoch;
   if (isEpoch) { const done = arr.length, left = from + INTERVAL - 1 - tip; note.replaceChildren(el('b', {}, `epoch ${epochN}`), ` · blocks ${from.toLocaleString()} – ${(from + INTERVAL - 1).toLocaleString()} · ${win === 'this' ? `${done.toLocaleString()} of ${INTERVAL.toLocaleString()} mined, ${left.toLocaleString()} to go${left * (s.interval || 240) < 86400 * 2 ? ` (about ${Math.max(1, Math.round(left * (s.interval || 240) / 3600))} h at the current pace)` : ''}` : `sealed, ${done.toLocaleString()} blocks`}${win === 'this' && done <= 24 ? ' · a fresh slate: this epoch has just begun' : ''}${epochN === FORK_EPOCH ? ` · the epoch of the split: ${LAST_SHARED.toLocaleString()} is the last block shared with Bitcoin Core, ${(LAST_SHARED + 1).toLocaleString()} – ${(BLAKE_FROM - 1).toLocaleString()} are Knots-only SHA256d blocks, BLAKE2b headers from ${BLAKE_FROM.toLocaleString()}` : ''}`, el('div', { class: 'prog' }, el('i', { style: `width:${(done / INTERVAL * 100).toFixed(1)}%` }))); }
   const label = isEpoch ? `epoch ${epochN}` : `last ${want}`;
+  const lb = blocks.get(tip), lt = $('#latest');
+  if (lb) {
+    lt.hidden = false; document.title = `${tip.toLocaleString()} · Pool Tracker`;
+    lt.replaceChildren(el('span', { class: 'newpill' }, 'new block'), swatch(lb.pool), el('span', {}, 'latest block ', el('a', { href: EXPLORER + lb.hash, target: '_blank', rel: 'noopener' }, el('b', {}, tip.toLocaleString())), ' mined by ', el('b', {}, lb.pool)), el('span', { class: 'tag', title: lb.tag }, lb.tag ? `“${lb.tag}”` : ''), el('span', { class: 'ago', 'data-t': lb.time }, `${age(lb.time)} ago`));
+    if (newest && newest === lb.hash && flashed !== newest) { flashed = newest; lt.classList.remove('flash'); void lt.offsetWidth; lt.classList.add('flash'); }
+  }
   $('#status').replaceChildren(el('b', {}, 'mainnet'), ` · tip ${tip.toLocaleString()} · last block ${age(blocks.get(tip)?.time ?? arr[0].time)} ago · ${loading || (short ? `${arr.length.toLocaleString()} of ${want.toLocaleString()} blocks loaded` : `${arr.length.toLocaleString()} blocks, ${fmt(arr.at(-1).time)} → ${fmt(arr[0].time)} UTC, ${s.span >= 172800 ? (s.span / 86400).toFixed(1) + ' days' : (s.span / 3600).toFixed(1) + ' h'}`)} · epoch ${epochOf(tip)}: ${(tip - epochOf(tip) * INTERVAL + 1).toLocaleString()} of ${INTERVAL.toLocaleString()}, `, el('b', {}, `${((epochOf(tip) + 1) * INTERVAL - 1 - tip).toLocaleString()} to go`), ` · chain ${linked(arr) ? 'links' : 'has a gap'} `,
     el('span', { class: linked(arr) ? 'ok' : 'bad' }, linked(arr) ? '✓' : '✗'), nipTip ? ` · NIP-333 relays say tip ${nipTip.toLocaleString()} ` : '', nipTip ? el('span', { class: Math.abs(nipTip - tip) <= 1 ? 'ok' : 'bad' }, Math.abs(nipTip - tip) <= 1 ? '✓' : `(${nipTip - tip > 0 ? '+' : ''}${nipTip - tip})`) : '');
 
@@ -340,7 +351,7 @@ function render() {
   $('#tblnote').textContent = arr.length > 144 ? `The newest 144 of ${arr.length.toLocaleString()} blocks; the charts above count all of them.` : '';
   for (const b of arr.slice(0, 144)) tb.append(el('tr', {}, el('td', {}, el('a', { href: EXPLORER + b.hash, target: '_blank', rel: 'noopener' }, b.height.toLocaleString())), el('td', {}, fmt(b.time)), el('td', {}, age(b.time)), el('td', {}, swatch(b.pool), b.pool), el('td', { class: 'tag', title: b.tag }, b.tag || '–'), el('td', { class: 'n' }, String(b.txs)), el('td', { class: 'n' }, btc(b.reward)), el('td', { class: 'n' }, btc(b.fees)), el('td', { class: 'n' }, `${(b.size / 1024).toFixed(0)} KB`)));
   persist();
-  if (newest) setTimeout(() => { newest = null; }, 1500); // the arrival animation plays once, not on every re-render
+  if (newest) setTimeout(() => { newest = null; }, 3500); // the arrival animation plays once, not on every re-render
 }
 const initials = (name) => name.split(/[\s._-]+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 3).toUpperCase() || '?';
 function setLive(on, text) { $('#live').classList.toggle('off', !on); $('#livetext').textContent = text; }
@@ -366,6 +377,7 @@ function subscribeNip333() {
 }
 setInterval(async () => { if (document.hidden) return; try { const h = Number(await (await fetch(`${API}/blocks/tip/height`)).text()); if (h > tip) { if (await refresh()) { newest = blocks.get(tip)?.hash; render(); } } } catch {} }, 60000);
 setInterval(() => { if (!document.hidden && blocks.size) render(); }, 30000); // ages
+setInterval(() => { const a = $('#latest .ago'); if (a && !document.hidden) a.textContent = `${age(Number(a.dataset.t))} ago`; }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh().then((c) => render()).catch(() => {}); });
 
 // ---- window buttons ------------------------------------------------------------------------------
