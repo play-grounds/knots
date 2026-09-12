@@ -29,7 +29,8 @@
   .sub { color: var(--mute); margin: 0 0 18px; max-width: 72ch; }
   .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
   .row .win { display: flex; flex-wrap: wrap; gap: 6px; } .row .win button { font: inherit; font-size: .9rem; padding: 5px 13px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--fg); cursor: pointer; }
-  .row .win button[aria-pressed=true] { border-color: var(--fg); font-weight: 600; }
+  .row .win button[aria-pressed=true], .row .win select[aria-pressed=true] { border-color: var(--fg); font-weight: 600; }
+  .row .win select { font: inherit; font-size: .9rem; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--fg); cursor: pointer; max-width: 100%; }
   .live { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; font-size: .88rem; color: var(--mute); } .live i { width: 9px; height: 9px; border-radius: 50%; background: var(--live); display: inline-block; box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 50%, transparent); animation: pulse 2.2s infinite; } .live.off i { background: var(--mute); animation: none; }
   @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 45%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
   .status { margin: 0 0 16px; color: var(--mute); font-size: .92rem; } .status b { color: var(--fg); } .ok { color: var(--ok); } .bad { color: var(--bad); }
@@ -71,14 +72,14 @@
 <main>
 <nav class="top"><a href="index.html" class="brand">knots</a><a href="headers.html">headers</a><a href="boundary.html">fork boundary</a><a href="block.html">tip block</a><a href="pools.html" aria-current="page">pools</a><a href="https://github.com/play-grounds/knots" target="_blank" rel="noopener">source</a></nav>
   <h1>Pool Tracker<small>who is mining the BLAKE2b chain</small></h1>
-  <p class="sub">The latest blocks of the Bitcoin Knots BLAKE2b mainnet chain, attributed to pools from what they wrote in the coinbase, counted as they arrive. How many pools mined the last twelve blocks or the whole difficulty epoch, how few of them hold a majority, and how long one pool has run unbroken. The epoch view starts from a clean slate every 2,016 blocks.</p>
+  <p class="sub">The latest blocks of the Bitcoin Knots BLAKE2b mainnet chain, attributed to pools from what they wrote in the coinbase, counted as they arrive. How many pools mined the last twelve blocks or a whole difficulty epoch, how few of them hold a majority, and how long one pool has run unbroken. Every epoch since the split from Bitcoin Core is here; the current one starts from a clean slate every 2,016 blocks.</p>
   <div class="row">
     <div class="win" role="group" aria-label="window">
       <button data-n="12" aria-pressed="true">last 12 blocks</button>
       <button data-n="48" aria-pressed="false">48</button>
       <button data-n="144" aria-pressed="false">144</button>
       <button data-n="this" aria-pressed="false" id="btn-this">this epoch</button>
-      <button data-n="last" aria-pressed="false" id="btn-last">last epoch</button>
+      <select id="pastsel" aria-label="past epochs" aria-pressed="false"><option value="">past epochs…</option></select>
     </div>
     <span class="live off" id="live"><i></i><span id="livetext">connecting…</span></span>
   </div>
@@ -103,7 +104,7 @@ const API = 'https://mempool.guide/api';
 const WS_URL = 'wss://mempool.guide/api/v1/ws';
 const RELAYS = ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.nostr.band'];
 const EXPLORER = 'https://mempool.guide/block/';
-const SLOTS = 7, CACHE_MAX = 4400, INTERVAL = 2016, SEED = 'data/pools/mainnet/';
+const SLOTS = 7, CACHE_MAX = 4400, INTERVAL = 2016, SEED = 'data/pools/mainnet/', FORK_EPOCH = 477, LAST_SHARED = 961631, BLAKE_FROM = 961640;
 const LS = { blocks: 'pooltracker.blocks.v2', colors: 'pooltracker.colors.v1', window: 'pooltracker.window.v2', horizons: 'pooltracker.horizons.v1' };
 const $ = (s) => document.querySelector(s);
 const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'style') e.style.cssText = v; else if (k.startsWith('on')) e[k] = v; else e.setAttribute(k, v); } for (const k of kids) e.append(k); return e; };
@@ -129,13 +130,12 @@ const norm = (b) => ({ hash: b.id, height: b.height, prev: b.previousblockhash, 
 const blocks = new Map(lsGet(LS.blocks, []).map((b) => [b.height, b])); // height -> block
 const colors = lsGet(LS.colors, {});                                     // pool name -> slot 1..7
 let horizons = lsGet(LS.horizons, null);                                  // { at, '24h': {...}, '1w': {...}, '1m': {...} }
-let win = ['12', '48', '144', 'this', 'last'].includes(lsGet(LS.window, '12')) ? lsGet(LS.window, '12') : '12';
+let win = /^(12|48|144|this|e:\d+)$/.test(lsGet(LS.window, '12')) ? lsGet(LS.window, '12') : '12';
 const seeded = new Set();
 let tip = Math.max(0, ...blocks.keys()), nipTip = 0, liveVia = '', newest = null, ws = null, loading = '';
 
 function persist() {
-  const arr = [...blocks.values()].sort((a, b) => b.height - a.height).slice(0, CACHE_MAX);
-  for (const b of [...blocks.values()]) if (b.height < arr.at(-1)?.height) blocks.delete(b.height);
+  const arr = [...blocks.values()].sort((a, b) => b.height - a.height).slice(0, CACHE_MAX); // newest blocks go to local storage; older epochs stay in memory and come from their seed files
   lsSet(LS.blocks, arr); lsSet(LS.colors, colors);
 }
 function ingest(raw) { // returns true if the block is new to us
@@ -147,7 +147,7 @@ function ingest(raw) { // returns true if the block is new to us
 const epochOf = (h) => Math.floor(h / INTERVAL);
 const range = () => { // [from, to] of the selected window at the current tip
   if (win === 'this') { const n = epochOf(tip); return [n * INTERVAL, tip]; }
-  if (win === 'last') { const n = epochOf(tip) - 1; return [n * INTERVAL, n * INTERVAL + INTERVAL - 1]; }
+  if (win.startsWith('e:')) { const n = Number(win.slice(2)); return [n * INTERVAL, n * INTERVAL + INTERVAL - 1]; }
   return [Math.max(1, tip - Number(win) + 1), tip];
 };
 const windowBlocks = () => { const [from, to] = range(), out = []; for (let h = to; h >= from; h--) { const b = blocks.get(h); if (!b) break; out.push(b); } return out; }; // newest first, stops at the first gap
@@ -167,7 +167,7 @@ async function seed(n) { // static per-epoch file from this repo, if there is on
 async function refresh() { // latest page, seed, then page down until the window is covered and linked
   let changed = false;
   for (const raw of await getJSON('/v1/blocks')) changed = ingest(raw) || changed;
-  if (win === 'this' || win === 'last') changed = (await seed(epochOf(range()[0]))) || changed;
+  if (win === 'this' || win.startsWith('e:')) changed = (await seed(epochOf(range()[0]))) || changed;
   const [from, to] = range(), want = to - from + 1;
   for (let guard = 0; guard < 160; guard++) {
     const have = windowBlocks();
@@ -200,7 +200,15 @@ function assignColors(counts) { // counts: [[name, n]] desc; the top seven get t
     colors[name] = slot;
   }
 }
-const colorOf = (name) => (colors[name] ? `var(--s${colors[name]})` : 'var(--other)');
+let palette = colors; // the map colorOf reads: the persisted one, or a local one for a sealed epoch view
+const colorOf = (name) => (palette[name] ? `var(--s${palette[name]})` : 'var(--other)');
+function epochPalette(counts) { // a sealed epoch colours its own seven biggest pools; pools that hold a colour elsewhere keep it
+  const local = {}, top = counts.slice(0, SLOTS).map(([n]) => n);
+  for (const n of top) if (colors[n]) local[n] = colors[n];
+  const used = new Set(Object.values(local));
+  for (const n of top) { if (local[n]) continue; const slot = Array.from({ length: SLOTS }, (_, i) => i + 1).find((x) => !used.has(x)); if (!slot) break; local[n] = slot; used.add(slot); }
+  return local;
+}
 const swatch = (name) => el('span', { class: 'sw', style: `background:${colorOf(name)}` });
 
 // ---- stats ---------------------------------------------------------------------------------------
@@ -234,10 +242,13 @@ function render() {
   if (!arr.length) { $('#status').textContent = 'no blocks yet…'; return; }
   const s = stats(arr);
   assignColors(horizons?.['1w']?.pools ?? s.sorted); // the week's seven biggest pools hold the seven colours, so colours agree across windows and days
-  const [from, to] = range(), want = to - from + 1, short = arr.length < want, isEpoch = win === 'this' || win === 'last', epochN = epochOf(from);
-  $('#btn-this').textContent = `epoch ${epochOf(tip)}`; $('#btn-last').textContent = `epoch ${epochOf(tip) - 1}`;
+  palette = win.startsWith('e:') ? epochPalette(s.sorted) : colors;
+  const [from, to] = range(), want = to - from + 1, short = arr.length < want, isEpoch = win === 'this' || win.startsWith('e:'), epochN = epochOf(from);
+  $('#btn-this').textContent = `epoch ${epochOf(tip)}`;
+  const sel = $('#pastsel'); if (sel.options.length !== epochOf(tip) - FORK_EPOCH + 1) { sel.replaceChildren(el('option', { value: '' }, 'past epochs…'), ...Array.from({ length: epochOf(tip) - FORK_EPOCH }, (_, i) => epochOf(tip) - 1 - i).map((n) => el('option', { value: `e:${n}` }, `epoch ${n} · ${(n * INTERVAL).toLocaleString()} – ${(n * INTERVAL + INTERVAL - 1).toLocaleString()}${n === FORK_EPOCH ? ' · the split' : ''}`))); }
+  sel.value = win.startsWith('e:') ? win : ''; sel.setAttribute('aria-pressed', String(win.startsWith('e:')));
   const note = $('#epochnote'); note.hidden = !isEpoch;
-  if (isEpoch) { const done = arr.length, left = from + INTERVAL - 1 - tip; note.replaceChildren(el('b', {}, `epoch ${epochN}`), ` · blocks ${from.toLocaleString()} – ${(from + INTERVAL - 1).toLocaleString()} · ${win === 'this' ? `${done.toLocaleString()} of ${INTERVAL.toLocaleString()} mined, ${left.toLocaleString()} to go${left * (s.interval || 240) < 86400 * 2 ? ` (about ${Math.max(1, Math.round(left * (s.interval || 240) / 3600))} h at the current pace)` : ''}` : `sealed, ${done.toLocaleString()} blocks`}${win === 'this' && done <= 24 ? ' · a fresh slate: this epoch has just begun' : ''}`, el('div', { class: 'prog' }, el('i', { style: `width:${(done / INTERVAL * 100).toFixed(1)}%` }))); }
+  if (isEpoch) { const done = arr.length, left = from + INTERVAL - 1 - tip; note.replaceChildren(el('b', {}, `epoch ${epochN}`), ` · blocks ${from.toLocaleString()} – ${(from + INTERVAL - 1).toLocaleString()} · ${win === 'this' ? `${done.toLocaleString()} of ${INTERVAL.toLocaleString()} mined, ${left.toLocaleString()} to go${left * (s.interval || 240) < 86400 * 2 ? ` (about ${Math.max(1, Math.round(left * (s.interval || 240) / 3600))} h at the current pace)` : ''}` : `sealed, ${done.toLocaleString()} blocks`}${win === 'this' && done <= 24 ? ' · a fresh slate: this epoch has just begun' : ''}${epochN === FORK_EPOCH ? ` · the epoch of the split: ${LAST_SHARED.toLocaleString()} is the last block shared with Bitcoin Core, ${(LAST_SHARED + 1).toLocaleString()} – ${(BLAKE_FROM - 1).toLocaleString()} are Knots-only SHA256d blocks, BLAKE2b headers from ${BLAKE_FROM.toLocaleString()}` : ''}`, el('div', { class: 'prog' }, el('i', { style: `width:${(done / INTERVAL * 100).toFixed(1)}%` }))); }
   const label = isEpoch ? `epoch ${epochN}` : `last ${want}`;
   $('#status').replaceChildren(el('b', {}, 'mainnet'), ` · tip ${tip.toLocaleString()} · last block ${age(blocks.get(tip)?.time ?? arr[0].time)} ago · ${loading || (short ? `${arr.length.toLocaleString()} of ${want.toLocaleString()} blocks loaded` : `${arr.length.toLocaleString()} blocks, ${fmt(arr.at(-1).time)} → ${fmt(arr[0].time)} UTC, ${s.span >= 172800 ? (s.span / 86400).toFixed(1) + ' days' : (s.span / 3600).toFixed(1) + ' h'}`)} · chain ${linked(arr) ? 'links' : 'has a gap'} `,
     el('span', { class: linked(arr) ? 'ok' : 'bad' }, linked(arr) ? '✓' : '✗'), nipTip ? ` · NIP-333 relays say tip ${nipTip.toLocaleString()} ` : '', nipTip ? el('span', { class: Math.abs(nipTip - tip) <= 1 ? 'ok' : 'bad' }, Math.abs(nipTip - tip) <= 1 ? '✓' : `(${nipTip - tip > 0 ? '+' : ''}${nipTip - tip})`) : '');
@@ -248,7 +259,7 @@ function render() {
   const kpi = (l, v, small, d, cls = '') => el('div', { class: 'kpi ' + cls }, el('div', { class: 'l' }, l), el('div', { class: 'v' }, v, small ? el('small', {}, small) : ''), el('div', { class: 'd' }, d));
   $('#kpis').replaceChildren(
     kpi('largest pool', pct(topN / s.n), '', `${topName} · ${topN} of ${s.n} blocks`, 'hero'),
-    kpi('pools to a majority', String(s.nakamoto), s.nakamoto === 1 ? ' pool' : ' pools', s.nakamoto === 1 ? `${topName} alone has over half` : `${s.sorted.slice(0, s.nakamoto).map((x) => x[0]).join(' + ')}`),
+    kpi('pools to a majority', String(s.nakamoto), s.nakamoto === 1 ? ' pool' : ' pools', s.nakamoto === 1 ? `${topName} alone has over half` : s.nakamoto <= 4 ? s.sorted.slice(0, s.nakamoto).map((x) => x[0]).join(' + ') : `${s.sorted.slice(0, 3).map((x) => x[0]).join(' + ')} + ${s.nakamoto - 3} more`),
     kpi('distinct pools', String(s.sorted.length), '', s.unknown ? `${s.unknown} block${s.unknown === 1 ? '' : 's'} unattributed` : `every block attributed`),
     kpi('concentration', s.hhi.toLocaleString(), ' HHI', hhiBand),
     kpi('longest streak', String(s.streak.len), s.streak.len === 1 ? ' block' : ' blocks', s.streak.len > 1 ? `${s.streak.pool}, ${s.streak.to.toLocaleString()}–${s.streak.from.toLocaleString()}` : 'no two in a row'),
@@ -306,13 +317,13 @@ function render() {
     const stack = el('div', { class: 'stack' });
     let otherN = 0, otherList = [];
     for (const [name, c] of pools) {
-      if (colors[name]) { const seg = el('i', { style: `width:${(c / total * 100).toFixed(2)}%;background:${colorOf(name)}`, tabindex: '0' }, c / total >= 0.11 ? el('span', {}, `${name} ${pct(c / total)}`) : ''); hover(seg, [[`${pct(c / total)} · ${c.toLocaleString()} blocks`, name]]); stack.append(seg); named.add(name); }
+      if (palette[name]) { const seg = el('i', { style: `width:${(c / total * 100).toFixed(2)}%;background:${colorOf(name)}`, tabindex: '0' }, c / total >= 0.11 ? el('span', {}, `${name} ${pct(c / total)}`) : ''); hover(seg, [[`${pct(c / total)} · ${c.toLocaleString()} blocks`, name]]); stack.append(seg); named.add(name); }
       else { otherN += c; otherList.push([name, c]); }
     }
     if (otherN) { const seg = el('i', { style: `width:${(otherN / total * 100).toFixed(2)}%;background:var(--other)`, tabindex: '0' }, otherN / total >= 0.11 ? el('span', {}, `${otherList.length} others ${pct(otherN / total)}`) : ''); hover(seg, [[`${pct(otherN / total)} · ${otherN.toLocaleString()} blocks`, `${otherList.length} pool${otherList.length === 1 ? '' : 's'} outside the seven colours`], ...otherList.slice(0, 8).map(([n, c]) => [String(c), n]), ...(otherList.length > 8 ? [['…', `${otherList.length - 8} more`]] : [])]); stack.append(seg); }
     hz.append(el('div', { class: 'hrow' }, el('span', { class: 'name' }, el('b', {}, label), el('small', {}, sub)), stack));
   }
-  $('#hzlegend').replaceChildren(...[...named].sort((a, b) => colors[a] - colors[b]).map((n) => el('span', {}, swatch(n), n)), el('span', {}, el('span', { class: 'sw', style: 'background:var(--other)' }), 'others'));
+  $('#hzlegend').replaceChildren(...[...named].sort((a, b) => palette[a] - palette[b]).map((n) => el('span', {}, swatch(n), n)), el('span', {}, el('span', { class: 'sw', style: 'background:var(--other)' }), 'others'));
 
   // table
   const tb = $('#tbl tbody'); tb.replaceChildren();
@@ -348,8 +359,9 @@ setInterval(() => { if (!document.hidden && blocks.size) render(); }, 30000); //
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh().then((c) => render()).catch(() => {}); });
 
 // ---- window buttons ------------------------------------------------------------------------------
-for (const b of document.querySelectorAll('.win button')) b.onclick = async () => { win = b.dataset.n; lsSet(LS.window, win); for (const x of document.querySelectorAll('.win button')) x.setAttribute('aria-pressed', String(x === b)); render(); try { await refresh(); } catch (e) { $('#status').textContent = e.message; } render(); };
+for (const b of document.querySelectorAll('.win button')) b.onclick = async () => { win = b.dataset.n; lsSet(LS.window, win); for (const x of document.querySelectorAll('.win button')) x.setAttribute('aria-pressed', String(x === b)); $('#pastsel').value = ''; render(); try { await refresh(); } catch (e) { $('#status').textContent = e.message; } render(); };
 for (const x of document.querySelectorAll('.win button')) x.setAttribute('aria-pressed', String(x.dataset.n === win));
+$('#pastsel').onchange = async (ev) => { if (!ev.target.value) return; win = ev.target.value; lsSet(LS.window, win); for (const x of document.querySelectorAll('.win button')) x.setAttribute('aria-pressed', 'false'); render(); try { await refresh(); } catch (e) { $('#status').textContent = e.message; } render(); };
 
 // ---- boot ----------------------------------------------------------------------------------------
 if (blocks.size) render(); // instant from local storage
