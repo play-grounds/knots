@@ -319,6 +319,7 @@ function render() {
   $('#tblnote').textContent = arr.length > 144 ? `The newest 144 of ${arr.length.toLocaleString()} blocks; the charts above count all of them.` : '';
   for (const b of arr.slice(0, 144)) tb.append(el('tr', {}, el('td', {}, el('a', { href: EXPLORER + b.hash, target: '_blank', rel: 'noopener' }, b.height.toLocaleString())), el('td', {}, fmt(b.time)), el('td', {}, age(b.time)), el('td', {}, swatch(b.pool), b.pool), el('td', { class: 'tag', title: b.tag }, b.tag || '–'), el('td', { class: 'n' }, String(b.txs)), el('td', { class: 'n' }, btc(b.reward)), el('td', { class: 'n' }, btc(b.fees)), el('td', { class: 'n' }, `${(b.size / 1024).toFixed(0)} KB`)));
   persist();
+  if (newest) setTimeout(() => { newest = null; }, 1500); // the arrival animation plays once, not on every re-render
 }
 const initials = (name) => name.split(/[\s._-]+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 3).toUpperCase() || '?';
 function setLive(on, text) { $('#live').classList.toggle('off', !on); $('#livetext').textContent = text; }
