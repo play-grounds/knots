@@ -91,7 +91,7 @@
     <section class="card"><h2>blocks by pool</h2><div class="bars" id="bars"></div><p class="note" id="barsnote"></p></section>
   </div>
   <section class="card"><h2 id="h-strip">the blocks, oldest to newest</h2><div class="strip" id="strip"></div></section>
-  <section class="card"><h2>wider horizons</h2><div class="hz" id="hz"></div><div class="hzlegend" id="hzlegend"></div><p class="note">The 24 hour, week and month rows are mempool.guide's own pool counts; the first row is this page's count of the window above. The seven colours belong to the week's seven biggest pools, so a pool keeps its colour across windows; every other pool is grey and named on hover and in the table.</p></section>
+  <section class="card"><h2>wider horizons</h2><div class="hz" id="hz"></div><div class="hzlegend" id="hzlegend"></div><p class="note">The last 12 and 48 rows are this page's own counts, as is the row for the window above when it is a different one; the 24 hour, week and month rows are mempool.guide's pool counts. The seven colours belong to the week's seven biggest pools, so a pool keeps its colour across windows; every other pool is grey and named on hover and in the table.</p></section>
   <section class="card"><h2>block list</h2><p class="note" id="tblnote" style="margin:0 0 8px"></p><div class="wrap"><table id="tbl"><thead><tr><th>height</th><th>time (UTC)</th><th>age</th><th>pool</th><th>coinbase says</th><th class="n">txs</th><th class="n">reward</th><th class="n">fees</th><th class="n">size</th></tr></thead><tbody></tbody></table></div></section>
   <details><summary>how this works</summary>
     <p>Blocks come from <a href="https://mempool.guide/">mempool.guide</a>, which follows the BLAKE2b chain: the REST API for the window, and its websocket for new blocks the moment they arrive. Each block's raw coinbase is decoded here and its printable text shown as <em>coinbase says</em>; the pool name is mempool.guide's attribution from its <a href="https://github.com/mempool/mining-pools">mining-pools</a> list of coinbase tags and payout addresses. A miner can write anything in a coinbase, so the name is a claim, not a proof; the raw text is beside it so you can judge.</p>
@@ -150,7 +150,9 @@ const range = () => { // [from, to] of the selected window at the current tip
   if (win.startsWith('e:')) { const n = Number(win.slice(2)); return [n * INTERVAL, n * INTERVAL + INTERVAL - 1]; }
   return [Math.max(1, tip - Number(win) + 1), tip];
 };
-const windowBlocks = () => { const [from, to] = range(), out = []; for (let h = to; h >= from; h--) { const b = blocks.get(h); if (!b) break; out.push(b); } return out; }; // newest first, stops at the first gap
+const rangeBlocks = (from, to) => { const out = []; for (let h = to; h >= from; h--) { const b = blocks.get(h); if (!b) break; out.push(b); } return out; }; // newest first, stops at the first gap
+const windowBlocks = () => rangeBlocks(...range());
+const lastN = (n) => rangeBlocks(Math.max(1, tip - n + 1), tip);
 const linked = (arr) => arr.every((b, i) => i === 0 || arr[i - 1].prev === b.hash);
 
 // ---- fetching ------------------------------------------------------------------------------------
@@ -168,18 +170,23 @@ async function refresh() { // latest page, seed, then page down until the window
   let changed = false;
   for (const raw of await getJSON('/v1/blocks')) changed = ingest(raw) || changed;
   if (win === 'this' || win.startsWith('e:')) changed = (await seed(epochOf(range()[0]))) || changed;
-  const [from, to] = range(), want = to - from + 1;
+  changed = (await cover(...range(), true)) || changed;
+  changed = (await cover(Math.max(1, tip - 47), tip, false)) || changed; // the horizons card always compares the last 48
+  loading = '';
+  if (changed) persist();
+  return changed;
+}
+async function cover(from, to, progress) { // page down until from..to is present and linked
+  let changed = false; const want = to - from + 1;
   for (let guard = 0; guard < 160; guard++) {
-    const have = windowBlocks();
+    const have = rangeBlocks(from, to);
     if (have.length >= want && linked(have)) break;
     const bad = have.length >= want ? have.findIndex((b, i) => i > 0 && have[i - 1].prev !== b.hash) : -1;
     const h = bad > 0 ? have[bad].height : to - have.length; // first bad link, or the first missing height
     if (h < from) break;
     for (const raw of await getJSON(`/v1/blocks/${h}`)) changed = ingest(raw) || changed;
-    if (guard % 3 === 2) { loading = `loading ${windowBlocks().length.toLocaleString()} of ${want.toLocaleString()} blocks…`; render(); }
+    if (progress && guard % 3 === 2) { loading = `loading ${rangeBlocks(from, to).length.toLocaleString()} of ${want.toLocaleString()} blocks…`; render(); }
   }
-  loading = '';
-  if (changed) persist();
   return changed;
 }
 async function refreshHorizons() {
@@ -250,7 +257,7 @@ function render() {
   const note = $('#epochnote'); note.hidden = !isEpoch;
   if (isEpoch) { const done = arr.length, left = from + INTERVAL - 1 - tip; note.replaceChildren(el('b', {}, `epoch ${epochN}`), ` · blocks ${from.toLocaleString()} – ${(from + INTERVAL - 1).toLocaleString()} · ${win === 'this' ? `${done.toLocaleString()} of ${INTERVAL.toLocaleString()} mined, ${left.toLocaleString()} to go${left * (s.interval || 240) < 86400 * 2 ? ` (about ${Math.max(1, Math.round(left * (s.interval || 240) / 3600))} h at the current pace)` : ''}` : `sealed, ${done.toLocaleString()} blocks`}${win === 'this' && done <= 24 ? ' · a fresh slate: this epoch has just begun' : ''}${epochN === FORK_EPOCH ? ` · the epoch of the split: ${LAST_SHARED.toLocaleString()} is the last block shared with Bitcoin Core, ${(LAST_SHARED + 1).toLocaleString()} – ${(BLAKE_FROM - 1).toLocaleString()} are Knots-only SHA256d blocks, BLAKE2b headers from ${BLAKE_FROM.toLocaleString()}` : ''}`, el('div', { class: 'prog' }, el('i', { style: `width:${(done / INTERVAL * 100).toFixed(1)}%` }))); }
   const label = isEpoch ? `epoch ${epochN}` : `last ${want}`;
-  $('#status').replaceChildren(el('b', {}, 'mainnet'), ` · tip ${tip.toLocaleString()} · last block ${age(blocks.get(tip)?.time ?? arr[0].time)} ago · ${loading || (short ? `${arr.length.toLocaleString()} of ${want.toLocaleString()} blocks loaded` : `${arr.length.toLocaleString()} blocks, ${fmt(arr.at(-1).time)} → ${fmt(arr[0].time)} UTC, ${s.span >= 172800 ? (s.span / 86400).toFixed(1) + ' days' : (s.span / 3600).toFixed(1) + ' h'}`)} · chain ${linked(arr) ? 'links' : 'has a gap'} `,
+  $('#status').replaceChildren(el('b', {}, 'mainnet'), ` · tip ${tip.toLocaleString()} · last block ${age(blocks.get(tip)?.time ?? arr[0].time)} ago · ${loading || (short ? `${arr.length.toLocaleString()} of ${want.toLocaleString()} blocks loaded` : `${arr.length.toLocaleString()} blocks, ${fmt(arr.at(-1).time)} → ${fmt(arr[0].time)} UTC, ${s.span >= 172800 ? (s.span / 86400).toFixed(1) + ' days' : (s.span / 3600).toFixed(1) + ' h'}`)} · epoch ${epochOf(tip)}: ${(tip - epochOf(tip) * INTERVAL + 1).toLocaleString()} of ${INTERVAL.toLocaleString()}, ${((epochOf(tip) + 1) * INTERVAL - 1 - tip).toLocaleString()} to go · chain ${linked(arr) ? 'links' : 'has a gap'} `,
     el('span', { class: linked(arr) ? 'ok' : 'bad' }, linked(arr) ? '✓' : '✗'), nipTip ? ` · NIP-333 relays say tip ${nipTip.toLocaleString()} ` : '', nipTip ? el('span', { class: Math.abs(nipTip - tip) <= 1 ? 'ok' : 'bad' }, Math.abs(nipTip - tip) <= 1 ? '✓' : `(${nipTip - tip > 0 ? '+' : ''}${nipTip - tip})`) : '');
 
   // KPIs
@@ -310,7 +317,10 @@ function render() {
 
   // horizons
   const hz = $('#hz'); hz.replaceChildren();
-  const rows = [[label, isEpoch ? `${s.n.toLocaleString()} blocks, this page` : 'blocks, this page', s.n, s.sorted]];
+  const countsOf = (a) => { const m = new Map(); for (const b of a) m.set(b.pool, (m.get(b.pool) ?? 0) + 1); return [...m.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])); };
+  const rows = [];
+  if (win !== '12' && win !== '48') rows.push([label, isEpoch ? `${s.n.toLocaleString()} blocks, this page` : 'blocks, this page', s.n, s.sorted]);
+  for (const n of [12, 48]) { const a = lastN(n); if (a.length) rows.push([`last ${n}`, a.length < n ? `${a.length} blocks loaded` : 'blocks', a.length, countsOf(a)]); }
   if (horizons) for (const [k, l] of [['24h', '24 hours'], ['1w', '1 week'], ['1m', '1 month']]) rows.push([l, `${horizons[k].total.toLocaleString()} blocks`, horizons[k].total, horizons[k].pools]);
   const named = new Set();
   for (const [label, sub, total, pools] of rows) {
