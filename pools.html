@@ -100,7 +100,7 @@
   <section class="card"><h2>block list</h2><p class="note" id="tblnote" style="margin:0 0 8px"></p><div class="wrap"><table id="tbl"><thead><tr><th>height</th><th>time (UTC)</th><th>age</th><th>pool</th><th>coinbase says</th><th class="n">txs</th><th class="n">reward</th><th class="n">fees</th><th class="n">size</th></tr></thead><tbody></tbody></table></div></section>
   <details><summary>how this works</summary>
     <p>Blocks come from <a href="https://mempool.guide/">mempool.guide</a>, which follows the BLAKE2b chain: the REST API for the window, and its websocket for new blocks the moment they arrive. Each block's raw coinbase is decoded here and its printable text shown as <em>coinbase says</em>; the pool name is mempool.guide's attribution from its <a href="https://github.com/mempool/mining-pools">mining-pools</a> list of coinbase tags and payout addresses. A miner can write anything in a coinbase, so the name is a claim, not a proof; the raw text is beside it so you can judge.</p>
-    <p><em>Pools to a majority</em> is the fewest pools whose blocks together exceed half the window (the Nakamoto coefficient). <em>Concentration</em> is the Herfindahl–Hirschman index, the sum of squared shares on a 10,000 scale: under 1,500 counts as unconcentrated, over 2,500 as highly concentrated in the usual antitrust reading. A window of twelve blocks is a snapshot, not a trend; the 48 and 144 block windows and the horizon rows give the longer view. The epoch views load a seed file from this repository (<code>data/pools/mainnet/&lt;n&gt;.json</code>, written by <code>tools/export-pools.mjs</code> from the same API) and top it up live; a new epoch starts from nothing, so the first blocks after a retarget are watched on a clean slate. Everything you have seen is kept in this browser's local storage, so the page renders instantly next time and fills in from there. <a href="headers.html">Headers</a> over Nostr (NIP-333) are used as a second signal that a new block exists.</p>
+    <p><em>Pools to a majority</em> is the fewest pools whose blocks together exceed half the window (the Nakamoto coefficient). <em>Concentration</em> is the Herfindahl–Hirschman index, the sum of squared shares on a 10,000 scale: under 1,500 counts as unconcentrated, over 2,500 as highly concentrated in the usual antitrust reading. A window of twelve blocks is a snapshot, not a trend; the 48 and 144 block windows and the horizon rows give the longer view. The epoch views load a seed file from this repository (<code>data/pools/mainnet/&lt;n&gt;.json</code>, written by <code>tools/export-pools.mjs</code> from the same API) and top it up live; a new epoch starts from nothing, so the first blocks after a retarget are watched on a clean slate. The window is bookmarkable: <code>?window=12</code>, <code>48</code>, <code>144</code>, <code>epoch</code> for the current epoch, or an epoch number such as <code>?window=477</code>. Everything you have seen is kept in this browser's local storage, so the page renders instantly next time and fills in from there. <a href="headers.html">Headers</a> over Nostr (NIP-333) are used as a second signal that a new block exists.</p>
   </details>
 </main>
 <div class="tooltip" id="tip" hidden></div>
@@ -135,7 +135,10 @@ const norm = (b) => ({ hash: b.id, height: b.height, prev: b.previousblockhash, 
 const blocks = new Map(lsGet(LS.blocks, []).map((b) => [b.height, b])); // height -> block
 const colors = lsGet(LS.colors, {});                                     // pool name -> slot 1..7
 let horizons = lsGet(LS.horizons, null);                                  // { at, '24h': {...}, '1w': {...}, '1m': {...} }
-let win = /^(12|48|144|this|e:\d+)$/.test(lsGet(LS.window, '12')) ? lsGet(LS.window, '12') : '12';
+const fromQuery = (() => { const q = new URLSearchParams(location.search).get('window'); if (!q) return null; if (/^(12|48|144)$/.test(q)) return q; if (q === 'epoch' || q === 'this') return 'this'; if (/^\d{3,}$/.test(q)) return `e:${q}`; return null; })();
+let win = fromQuery ?? (/^(12|48|144|this|e:\d+)$/.test(lsGet(LS.window, '12')) ? lsGet(LS.window, '12') : '12');
+const syncUrl = () => { const u = new URL(location.href); u.searchParams.set('window', win === 'this' ? 'epoch' : win.startsWith('e:') ? win.slice(2) : win); history.replaceState(null, '', u); };
+if (fromQuery) lsSet(LS.window, win);
 const seeded = new Set();
 let tip = Math.max(0, ...blocks.keys()), nipTip = 0, liveVia = '', newest = null, ws = null, loading = '', flashed = null;
 
@@ -255,6 +258,7 @@ function render() {
   const s = stats(arr);
   assignColors(horizons?.['1w']?.pools ?? s.sorted); // the week's seven biggest pools hold the seven colours, so colours agree across windows and days
   palette = win.startsWith('e:') ? epochPalette(s.sorted) : colors;
+  if (win === `e:${epochOf(tip)}`) { win = 'this'; lsSet(LS.window, win); syncUrl(); }
   const [from, to] = range(), want = to - from + 1, short = arr.length < want, isEpoch = win === 'this' || win.startsWith('e:'), epochN = epochOf(from);
   $('#btn-this').textContent = `epoch ${epochOf(tip)}`;
   const sel = $('#pastsel'); if (sel.options.length !== epochOf(tip) - FORK_EPOCH + 1) { sel.replaceChildren(el('option', { value: '' }, 'past epochs…'), ...Array.from({ length: epochOf(tip) - FORK_EPOCH }, (_, i) => epochOf(tip) - 1 - i).map((n) => el('option', { value: `e:${n}` }, `epoch ${n} · ${(n * INTERVAL).toLocaleString()} – ${(n * INTERVAL + INTERVAL - 1).toLocaleString()}${n === FORK_EPOCH ? ' · the split' : ''}`))); }
@@ -268,7 +272,7 @@ function render() {
     lt.replaceChildren(el('span', { class: 'newpill' }, 'new block'), swatch(lb.pool), el('span', {}, 'latest block ', el('a', { href: EXPLORER + lb.hash, target: '_blank', rel: 'noopener' }, el('b', {}, tip.toLocaleString())), ' mined by ', el('b', {}, lb.pool)), el('span', { class: 'tag', title: lb.tag }, lb.tag ? `“${lb.tag}”` : ''), el('span', { class: 'ago', 'data-t': lb.time }, `${age(lb.time)} ago`));
     if (newest && newest === lb.hash && flashed !== newest) { flashed = newest; lt.classList.remove('flash'); void lt.offsetWidth; lt.classList.add('flash'); }
   }
-  $('#status').replaceChildren(el('b', {}, 'mainnet'), ` · tip ${tip.toLocaleString()} · last block ${age(blocks.get(tip)?.time ?? arr[0].time)} ago · ${loading || (short ? `${arr.length.toLocaleString()} of ${want.toLocaleString()} blocks loaded` : `${arr.length.toLocaleString()} blocks, ${fmt(arr.at(-1).time)} → ${fmt(arr[0].time)} UTC, ${s.span >= 172800 ? (s.span / 86400).toFixed(1) + ' days' : (s.span / 3600).toFixed(1) + ' h'}`)} · epoch ${epochOf(tip)}: ${(tip - epochOf(tip) * INTERVAL + 1).toLocaleString()} of ${INTERVAL.toLocaleString()}, `, el('b', {}, `${((epochOf(tip) + 1) * INTERVAL - 1 - tip).toLocaleString()} to go`), ` · chain ${linked(arr) ? 'links' : 'has a gap'} `,
+  $('#status').replaceChildren(el('b', {}, 'mainnet'), ` · tip ${tip.toLocaleString()} · last block ${age(blocks.get(tip)?.time ?? arr[0].time)} ago · ${loading || (short ? `${arr.length.toLocaleString()} of ${want.toLocaleString()} blocks loaded` : `${arr.length.toLocaleString()} block${arr.length === 1 ? '' : 's'}, ${fmt(arr.at(-1).time)} → ${fmt(arr[0].time)} UTC, ${s.span >= 172800 ? (s.span / 86400).toFixed(1) + ' days' : (s.span / 3600).toFixed(1) + ' h'}`)} · epoch ${epochOf(tip)}: ${(tip - epochOf(tip) * INTERVAL + 1).toLocaleString()} of ${INTERVAL.toLocaleString()}, `, el('b', {}, `${((epochOf(tip) + 1) * INTERVAL - 1 - tip).toLocaleString()} to go`), ` · chain ${linked(arr) ? 'links' : 'has a gap'} `,
     el('span', { class: linked(arr) ? 'ok' : 'bad' }, linked(arr) ? '✓' : '✗'), nipTip ? ` · NIP-333 relays say tip ${nipTip.toLocaleString()} ` : '', nipTip ? el('span', { class: Math.abs(nipTip - tip) <= 1 ? 'ok' : 'bad' }, Math.abs(nipTip - tip) <= 1 ? '✓' : `(${nipTip - tip > 0 ? '+' : ''}${nipTip - tip})`) : '');
 
   // KPIs
@@ -286,7 +290,7 @@ function render() {
 
   // donut: top 6 + other
   const segs = s.sorted.slice(0, 6).map(([name, c]) => ({ name, c })); const rest = s.sorted.slice(6); if (rest.length) segs.push({ name: rest.length === 1 ? rest[0][0] : `${rest.length} other pools`, c: rest.reduce((a, [, c]) => a + c, 0), other: true, list: rest });
-  const svg = $('#donut'); svg.replaceChildren(); $('#h-share').textContent = isEpoch ? `share of epoch ${epochN}, ${s.n.toLocaleString()} blocks` : `share of the last ${s.n} blocks`;
+  const svg = $('#donut'); svg.replaceChildren(); $('#h-share').textContent = isEpoch ? `share of epoch ${epochN}, ${s.n.toLocaleString()} block${s.n === 1 ? '' : 's'}` : `share of the last ${s.n} blocks`;
   const R = 78, C = 2 * Math.PI * R, gap = segs.length > 1 ? 2.5 : 0; let off = 0;
   const legend = $('#legend'); legend.replaceChildren();
   segs.forEach((g, i) => {
@@ -330,7 +334,7 @@ function render() {
   const hz = $('#hz'); hz.replaceChildren();
   const countsOf = (a) => { const m = new Map(); for (const b of a) m.set(b.pool, (m.get(b.pool) ?? 0) + 1); return [...m.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])); };
   const rows = [];
-  if (win !== '12' && win !== '48') rows.push([label, isEpoch ? `${s.n.toLocaleString()} blocks, this page` : 'blocks, this page', s.n, s.sorted]);
+  if (win !== '12' && win !== '48') rows.push([label, isEpoch ? `${s.n.toLocaleString()} block${s.n === 1 ? '' : 's'}, this page` : 'blocks, this page', s.n, s.sorted]);
   for (const n of [12, 48]) { const a = lastN(n); if (a.length) rows.push([`last ${n}`, a.length < n ? `${a.length} blocks loaded` : 'blocks', a.length, countsOf(a)]); }
   if (horizons) for (const [k, l] of [['24h', '24 hours'], ['1w', '1 week'], ['1m', '1 month']]) rows.push([l, `${horizons[k].total.toLocaleString()} blocks`, horizons[k].total, horizons[k].pools]);
   const named = new Set();
@@ -341,7 +345,7 @@ function render() {
       if (palette[name]) { const seg = el('i', { style: `width:${(c / total * 100).toFixed(2)}%;background:${colorOf(name)}`, tabindex: '0' }, c / total >= 0.11 ? el('span', {}, `${name} ${pct(c / total)}`) : ''); hover(seg, [[`${pct(c / total)} · ${c.toLocaleString()} blocks`, name]]); stack.append(seg); named.add(name); }
       else { otherN += c; otherList.push([name, c]); }
     }
-    if (otherN) { const seg = el('i', { style: `width:${(otherN / total * 100).toFixed(2)}%;background:var(--other)`, tabindex: '0' }, otherN / total >= 0.11 ? el('span', {}, `${otherList.length} others ${pct(otherN / total)}`) : ''); hover(seg, [[`${pct(otherN / total)} · ${otherN.toLocaleString()} blocks`, `${otherList.length} pool${otherList.length === 1 ? '' : 's'} outside the seven colours`], ...otherList.slice(0, 8).map(([n, c]) => [String(c), n]), ...(otherList.length > 8 ? [['…', `${otherList.length - 8} more`]] : [])]); stack.append(seg); }
+    if (otherN) { const seg = el('i', { style: `width:${(otherN / total * 100).toFixed(2)}%;background:var(--other)`, tabindex: '0' }, otherN / total >= 0.11 ? el('span', {}, `${otherList.length === 1 ? otherList[0][0] : otherList.length + ' others'} ${pct(otherN / total)}`) : ''); hover(seg, [[`${pct(otherN / total)} · ${otherN.toLocaleString()} blocks`, `${otherList.length} pool${otherList.length === 1 ? '' : 's'} outside the seven colours`], ...otherList.slice(0, 8).map(([n, c]) => [String(c), n]), ...(otherList.length > 8 ? [['…', `${otherList.length - 8} more`]] : [])]); stack.append(seg); }
     hz.append(el('div', { class: 'hrow' }, el('span', { class: 'name' }, el('b', {}, label), el('small', {}, sub)), stack));
   }
   $('#hzlegend').replaceChildren(...[...named].sort((a, b) => palette[a] - palette[b]).map((n) => el('span', {}, swatch(n), n)), el('span', {}, el('span', { class: 'sw', style: 'background:var(--other)' }), 'others'));
@@ -381,9 +385,9 @@ setInterval(() => { const a = $('#latest .ago'); if (a && !document.hidden) a.te
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh().then((c) => render()).catch(() => {}); });
 
 // ---- window buttons ------------------------------------------------------------------------------
-for (const b of document.querySelectorAll('.win button')) b.onclick = async () => { win = b.dataset.n; lsSet(LS.window, win); for (const x of document.querySelectorAll('.win button')) x.setAttribute('aria-pressed', String(x === b)); $('#pastsel').value = ''; render(); try { await refresh(); } catch (e) { $('#status').textContent = e.message; } render(); };
+for (const b of document.querySelectorAll('.win button')) b.onclick = async () => { win = b.dataset.n; lsSet(LS.window, win); syncUrl(); for (const x of document.querySelectorAll('.win button')) x.setAttribute('aria-pressed', String(x === b)); $('#pastsel').value = ''; render(); try { await refresh(); } catch (e) { $('#status').textContent = e.message; } render(); };
 for (const x of document.querySelectorAll('.win button')) x.setAttribute('aria-pressed', String(x.dataset.n === win));
-$('#pastsel').onchange = async (ev) => { if (!ev.target.value) return; win = ev.target.value; lsSet(LS.window, win); for (const x of document.querySelectorAll('.win button')) x.setAttribute('aria-pressed', 'false'); render(); try { await refresh(); } catch (e) { $('#status').textContent = e.message; } render(); };
+$('#pastsel').onchange = async (ev) => { if (!ev.target.value) return; win = ev.target.value; lsSet(LS.window, win); syncUrl(); for (const x of document.querySelectorAll('.win button')) x.setAttribute('aria-pressed', 'false'); render(); try { await refresh(); } catch (e) { $('#status').textContent = e.message; } render(); };
 
 // ---- boot ----------------------------------------------------------------------------------------
 if (blocks.size) render(); // instant from local storage
